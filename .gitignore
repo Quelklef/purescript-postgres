@@ -1,2 +1,4 @@
 output/
+pg/
+node_modules/
 .purs-nix-run.js

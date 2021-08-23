@@ -35,6 +35,15 @@ nixed = purs-nix.purs
       ];
   };
 
+gitignoreSource =
+  let src = pkgs.fetchFromGitHub {
+    owner = "hercules-ci";
+    repo = "gitignore.nix";
+    rev = "211907489e9f198594c0eb0ca9256a1949c9d412";
+    sha256 = "06j7wpvj54khw0z10fjyi31kpafkr6hi1k0di13k1xp8kywvfyx8";
+  };
+  in (import src { inherit (pkgs) lib; }).gitignoreSource;
+
 npmlock2nix =
   let fetched = pkgs.fetchFromGitHub {
         owner = "tweag";
@@ -44,7 +53,7 @@ npmlock2nix =
       };
   in import fetched { inherit pkgs; };
 
-node_modules = npmlock2nix.node_modules { src = ./.; };
+node_modules = npmlock2nix.node_modules { src = gitignoreSource ./.; };
 
 in pkgs.mkShell {
   buildInputs =
@@ -58,7 +67,7 @@ in pkgs.mkShell {
 
     shellHook = ''
 
-      local root=$PWD
+      root=$PWD
 
       function pspg.pg-init {
         mkdir -p "$root"/pg/{cluster,socket}
@@ -75,13 +84,24 @@ in pkgs.mkShell {
       }
       export PGHOST=$root/pg/socket
 
-      function y.pg-obliterate {
+      function pspg.pg-obliterate {
         # Sometimes useful
         ps -aux | grep postgres | awk '{ print $2 }' | xargs sudo kill -9
       }
 
+      alias pspg.psql="psql -d pspg -U pspg"
+
       export LC_ALL=C.UTF-8  # fix postgres
-      export PSPG_DB_CONN_STRING="postgresql://pspg@localhost?host=$root/pg/socket"
+      export PSPG_TESTING_DB_CONN_STRING="postgresql://pspg@localhost?host=$root/pg/socket"
+
+      function pspg.test {
+        NODE_PATH=${node_modules}/node_modules purs-nix test
+      }
+
+      function pspg.test-watch {
+        export -f pspg.test
+        find src test | ${pkgs.entr}/bin/entr -cs pspg.test
+      }
 
     '';
 }

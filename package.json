@@ -1,0 +1,16 @@
+{
+  "name": "purescript-postgres",
+  "version": "0.0.1",
+  "description": "",
+  "main": "main.js",
+  "scripts": { },
+  "repository": {
+    "type": "git",
+    "url": "github.com/quelklef/purescript-postgres"
+  },
+  "author": "Quelklef",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "pg": "^8.6.0"
+  }
+}
