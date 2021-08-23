@@ -16,8 +16,6 @@ async function()
   if (params.length)
     query.values = params;
 
-  console.log('Executing the following SQL:\n' + sql);
-
   const returned = await conn.query(query);
 
   let rows;

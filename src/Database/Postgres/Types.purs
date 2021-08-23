@@ -8,6 +8,8 @@ module Database.Postgres.Types
 import Prelude
 
 import Data.Newtype (class Newtype)
+import Data.Generic.Rep (class Generic)
+import Data.Show.Generic (genericShow)
 
 
 -- | Used as documentation to communicate that a string is intended to
@@ -17,6 +19,10 @@ import Data.Newtype (class Newtype)
 newtype PgExpr = PgExpr String
 
 derive instance newtype_PgExpr :: Newtype PgExpr _
+derive instance generic_PgExpr :: Generic PgExpr _
+instance show_PgExpr :: Show PgExpr where show = genericShow
+derive instance eq_PgExpr :: Eq PgExpr
+derive instance ord_PgExpr :: Ord PgExpr
 
 
 -- | Represents an SQL composite type (aka row)
@@ -28,6 +34,12 @@ derive instance newtype_PgExpr :: Newtype PgExpr _
 -- |
 -- | Called `Tup` instead of `Row` to avoid naming conflicts with `Prim.Row`
 newtype Tup a = Tup a
+
+derive instance newtype_Tup :: Newtype (Tup a) _
+derive instance generic_Tup :: Generic (Tup a) _
+instance show_Tup :: Show a => Show (Tup a) where show = genericShow
+derive instance eq_Tup :: Eq a => Eq (Tup a)
+derive instance ord_Tup :: Ord a => Ord (Tup a)
 
 -- | Alias for `Tup Unit`
 type Tup0 = Tup Unit
