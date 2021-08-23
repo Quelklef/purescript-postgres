@@ -123,23 +123,17 @@ data ParseErr = ParseErr
 -- end core --
 
 instance show_ParseErr :: Show ParseErr where
-  show = \(ParseErr err) ->
-    let
-      indent :: String -> String -> String
-      indent dent = String.split (String.Pattern "\n") >>> map (dent <> _) >>> intercalate "\n"
-
-    in
-      [ "Failed to parse PostgreSQL expr"
-      , "Of type: " <> fromMaybe "<unknown>" err.typename
-      , "Because: " <> err.issue ]
-      <>
-      (case err.culprit of
-        Nothing -> []
-        Just (PgExpr culp) -> ["Caused by the expression: " <> culp])
-      <>
-      [ List.reverse err.context # map ("... " <> _) # intercalate "\n"
-      , "Probable cause: an SQL row was returned that does not match the format of some FromPg instance."
-      ] # intercalate "\n"
+  show = \(ParseErr err) -> intercalate "\n" $
+    [ "Failed to parse PostgreSQL expression!" ]
+    <>
+    (case err.culprit of
+      Nothing -> []
+      Just (PgExpr culp) -> ["Expression: " <> culp])
+    <>
+    [ "Error: " <> err.issue
+    , List.reverse err.context # map ("... " <> _) # intercalate "\n"
+    , "... while parsing expression as " <> fromMaybe "<unknown>" err.typename
+    ]
 
 mkErr :: Maybe PgExpr -> String -> ParseErr
 mkErr culprit issue = ParseErr { issue, culprit, context: mempty, typename: Nothing }
