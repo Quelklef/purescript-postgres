@@ -37,9 +37,6 @@ foreign import query_f ::
   , params :: Array PgExpr
   } -> Effect (Promise (Array PgExpr))  -- (pg expr)[]
 
-toAff' :: forall m a. MonadAff m => Effect (Promise a) -> m a
-toAff' = toAffE >>> liftAff
-
 -- | Represents an error when executing a query
 -- |
 -- | The variants' semantics are as follows:

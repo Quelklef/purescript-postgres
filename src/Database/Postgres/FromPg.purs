@@ -14,8 +14,6 @@ module Database.Postgres.FromPg
 import Prelude
 
 import Data.Maybe (Maybe(..), maybe, fromMaybe)
-import Data.String.Common (split) as String
-import Data.String.Pattern (Pattern(..)) as String
 import Data.List (List)
 import Data.List as List
 import Data.Array (uncons) as Array
