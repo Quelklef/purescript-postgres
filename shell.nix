@@ -14,7 +14,6 @@ nixed = purs-nix.purs
   { srcs = [ ./src ];
     dependencies =
       with purs-nix.ps-pkgs;
-      let ns = purs-nix.ps-pkgs-ns; in
       [
         effect
         lists
@@ -26,6 +25,13 @@ nixed = purs-nix.purs
         argonaut-core
         argonaut-codecs
         argonaut-generic
+        spec  # actually a test dep, but purs-nix seems to be bugged (?)
+      ];
+
+    test-dependencies =
+      with purs-nix.ps-pkgs;
+      [
+        spec
       ];
   };
 
@@ -42,7 +48,10 @@ node_modules = npmlock2nix.node_modules { src = ./.; };
 
 in pkgs.mkShell {
   buildInputs =
-    [ (nixed.command { srcs = [ "$PWD" ]; })
+    [ (nixed.command {
+        srcs = [ "$PWD" ];
+        test = "$PWD/test";
+      })
       pkgs.nodejs
       pkgs.postgresql
     ];
