@@ -1,4 +1,4 @@
-const pg = require('pg');
+import pg from 'pg';
 
 // Suppress node-postgres parsing values in retrieved rows
 // This relies on implementation details of node-postgres
@@ -7,7 +7,7 @@ pg.types.getTypeParser = () => x => x;
 // As it turns out, formatting of inserted rows doesn't also need to be disabled
 // We can just pass PostgreSQL expressions as strings and it'll work
 
-exports.query_f =
+export const query_f =
 ({ conn, sql, params }) =>
 async function()
 {

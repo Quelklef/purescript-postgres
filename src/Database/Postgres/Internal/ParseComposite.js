@@ -1,4 +1,4 @@
-exports.parseComposite_f =
+export const parseComposite_f =
 ({ left, right }) =>
 ({ open, delim, close }) => expr =>
 {

@@ -1,14 +1,27 @@
-{ pkgs ? import <nixpkgs> {} }:
+{ pkgs ? import <nixpkgs> {}
+, system ? builtins.currentSystem
+}:
 
 let
 
-purs-nix =
+get-flake =
   import
-    (builtins.fetchGit
-       { url = "https://github.com/ursi/purs-nix.git";
-         rev = "988505248316b1dc82504c8e25358da535e34bd6";
-       }
-    ) {};
+    (pkgs.fetchFromGitHub
+      { owner = "ursi";
+        repo = "get-flake";
+        rev = "703f15558daa56dfae19d1858bb3046afe68831a";
+        sha256 = "1crp9fpvwg53ldkfxnh0wyxx470lm8bs025rck2bn5jn8jqmhj6f";
+      });
+
+purs-nix =
+  get-flake
+    (pkgs.fetchFromGitHub
+      { owner = "ursi";
+        repo = "purs-nix";
+        rev = "18c1cae603b876c62515b7e4a3d4b587119e006b";
+        sha256 = "0v78qgn0pdpmyy2wmyv0cig9mdflkcmaydgjqr6rxs4x3h1y4brv";
+      }
+    ) { inherit system; };
 
 nixed = purs-nix.purs
   { srcs = [ ./src ];
@@ -36,22 +49,24 @@ nixed = purs-nix.purs
   };
 
 gitignoreSource =
-  let src = pkgs.fetchFromGitHub {
-    owner = "hercules-ci";
-    repo = "gitignore.nix";
-    rev = "211907489e9f198594c0eb0ca9256a1949c9d412";
-    sha256 = "06j7wpvj54khw0z10fjyi31kpafkr6hi1k0di13k1xp8kywvfyx8";
-  };
-  in (import src { inherit (pkgs) lib; }).gitignoreSource;
+  (import
+    (pkgs.fetchFromGitHub
+      { owner = "hercules-ci";
+        repo = "gitignore.nix";
+        rev = "a20de23b925fd8264fd7fad6454652e142fd7f73";
+        sha256 = "07vg2i9va38zbld9abs9lzqblz193vc5wvqd6h7amkmwf66ljcgh";
+      }
+    ) { inherit (pkgs) lib; }).gitignoreSource;
 
 npmlock2nix =
-  let fetched = pkgs.fetchFromGitHub {
-        owner = "tweag";
+  import
+    (pkgs.fetchFromGitHub
+      { owner = "tweag";
         repo = "npmlock2nix";
-        rev = "8ada8945e05b215f3fffbd10111f266ea70bb502";
-        sha256 = "0ni3z64wf1cha7xf5vqzqfqs73qc938zvnnbn147li1m4v8pnzzx";
-      };
-  in import fetched { inherit pkgs; };
+        rev = "5c4f247688fc91d665df65f71c81e0726621aaa8";
+        sha256 = "1zkrcph1vqgl0q7yi9cg0ghq1mmvhy8rlc6xvyww56i3j87cg5gn";
+      }
+    ) { inherit pkgs; };
 
 node_modules = npmlock2nix.node_modules { src = gitignoreSource ./.; };
 

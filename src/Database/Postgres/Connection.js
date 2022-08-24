@@ -1,6 +1,6 @@
-const pg = require('pg');
+import pg from 'pg';
 
-exports.open_f =
+export const open_f =
 connectionString =>
 async function()
 {
