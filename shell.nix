@@ -70,6 +70,15 @@ npmlock2nix =
 
 node_modules = npmlock2nix.node_modules { src = gitignoreSource ./.; };
 
+local-postgres =
+  import
+    (pkgs.fetchFromGitHub
+      { owner = "quelklef";
+        repo = "local-postgres";
+        rev = "7a313efd50eb7710fee02b719728028486ff4526";
+        sha256 = "1qw9b97f1pp0fyji0z684b0ja8b32n24m19izqj7km45sczqgljx";
+      }) { inherit pkgs; };
+
 in pkgs.mkShell {
   buildInputs =
     [ (nixed.command {
@@ -78,45 +87,14 @@ in pkgs.mkShell {
       })
       pkgs.nodejs
       pkgs.postgresql
+      local-postgres
     ];
 
     shellHook = ''
-
-      root=$PWD
-
-      function pspg.pg-init {
-        mkdir -p "$root"/pg/{cluster,socket}
-        initdb "$root"/pg/cluster
-        pspg.pg-start
-        createdb pspg
-        createuser pspg
+      function init_pg {
+        pgloc=$PWD/pg
+        [ -e $pgloc ] || lpg make $pgloc
+        export PSPG_TESTING_DB_CONN_STRING=$(lpg do $pgloc bash -c 'echo $LPG_CONNSTR')
       }
-      export PGDATA=$PWD/pg/cluster
-
-      function pspg.pg-start {
-        pg_ctl -l "$root"/pg/log -o "--unix_socket_directories='$root/pg/socket'" start
-        # stop with pg_ctl stop
-      }
-      export PGHOST=$root/pg/socket
-
-      function pspg.pg-obliterate {
-        # Sometimes useful
-        ps -aux | grep postgres | awk '{ print $2 }' | xargs sudo kill -9
-      }
-
-      alias pspg.psql="psql -d pspg -U pspg"
-
-      export LC_ALL=C.UTF-8  # fix postgres
-      export PSPG_TESTING_DB_CONN_STRING="postgresql://pspg@localhost?host=$root/pg/socket"
-
-      function pspg.test {
-        NODE_PATH=${node_modules}/node_modules purs-nix test
-      }
-
-      function pspg.test-watch {
-        export -f pspg.test
-        find src test | ${pkgs.entr}/bin/entr -cs pspg.test
-      }
-
     '';
 }
