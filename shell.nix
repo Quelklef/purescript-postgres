@@ -1,4 +1,4 @@
-{ pkgs ? import <nixpkgs> {}
+{ pkgs ? import ./pkgs.nix {}
 , system ? builtins.currentSystem
 }:
 
@@ -18,8 +18,8 @@ purs-nix =
     (pkgs.fetchFromGitHub
       { owner = "ursi";
         repo = "purs-nix";
-        rev = "18c1cae603b876c62515b7e4a3d4b587119e006b";
-        sha256 = "0v78qgn0pdpmyy2wmyv0cig9mdflkcmaydgjqr6rxs4x3h1y4brv";
+        rev = "66427405d2a3e0c2491646a6efc1716ce3731f3d";
+        sha256 = "sha256-aArvsmkMc+LF2wEdLryiX/kqzMjtLsbcniIuSfFKgxg=";
       }
     ) { inherit system; };
 
@@ -27,7 +27,7 @@ package = import ./package.nix purs-nix;
 
 nixed = purs-nix.purs
   { srcs = [ ./src ];
-    inherit (package) dependencies;
+    inherit (package) dependencies foreign;
 
     test-dependencies =
       with purs-nix.ps-pkgs;
@@ -35,28 +35,6 @@ nixed = purs-nix.purs
         spec
       ];
   };
-
-gitignoreSource =
-  (import
-    (pkgs.fetchFromGitHub
-      { owner = "hercules-ci";
-        repo = "gitignore.nix";
-        rev = "a20de23b925fd8264fd7fad6454652e142fd7f73";
-        sha256 = "07vg2i9va38zbld9abs9lzqblz193vc5wvqd6h7amkmwf66ljcgh";
-      }
-    ) { inherit (pkgs) lib; }).gitignoreSource;
-
-npmlock2nix =
-  import
-    (pkgs.fetchFromGitHub
-      { owner = "tweag";
-        repo = "npmlock2nix";
-        rev = "5c4f247688fc91d665df65f71c81e0726621aaa8";
-        sha256 = "1zkrcph1vqgl0q7yi9cg0ghq1mmvhy8rlc6xvyww56i3j87cg5gn";
-      }
-    ) { inherit pkgs; };
-
-node_modules = npmlock2nix.node_modules { src = gitignoreSource ./.; };
 
 local-postgres =
   import
