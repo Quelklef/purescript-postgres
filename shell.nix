@@ -38,7 +38,6 @@ nixed = purs-nix.purs
         argonaut-core
         argonaut-codecs
         argonaut-generic
-        spec  # actually a test dep, but purs-nix seems to be bugged (?)
       ];
 
     test-dependencies =
