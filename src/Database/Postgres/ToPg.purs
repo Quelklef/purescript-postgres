@@ -15,14 +15,14 @@ import Data.Set (Set)
 import Data.Set as Set
 import Data.Array as Array
 import Data.Tuple.Nested ((/\), type (/\))
-import Data.String.Common (replace) as Str
+import Data.String.Common (replaceAll) as Str
 import Data.String.Pattern (Pattern(..), Replacement(..)) as Str
 import Data.Newtype (un)
 
 import Database.Postgres.Types (Tup(..), PgExpr(..))
 
 replace :: { this :: String, with :: String } -> String -> String
-replace { this, with } = Str.replace (Str.Pattern this) (Str.Replacement with)
+replace { this, with } = Str.replaceAll (Str.Pattern this) (Str.Replacement with)
 
 escape :: Array String -> String -> String
 escape specials =
