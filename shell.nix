@@ -23,22 +23,11 @@ purs-nix =
       }
     ) { inherit system; };
 
+package = import ./package.nix purs-nix;
+
 nixed = purs-nix.purs
   { srcs = [ ./src ];
-    dependencies =
-      with purs-nix.ps-pkgs;
-      [
-        effect
-        lists
-        arrays
-        maybe
-        either
-        aff
-        aff-promise
-        argonaut-core
-        argonaut-codecs
-        argonaut-generic
-      ];
+    inherit (package) dependencies;
 
     test-dependencies =
       with purs-nix.ps-pkgs;
