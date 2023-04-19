@@ -52,6 +52,7 @@ in pkgs.mkShell {
         test = "$PWD/test";
       })
       pkgs.nodejs
+      pkgs.glibcLocales
       pkgs.postgresql
       local-postgres
     ];
