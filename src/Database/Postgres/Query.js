@@ -35,7 +35,11 @@ async function()
 
 function printComposite(arr, chars) {
   const [open, delim, close] = [...chars];
-  return open + arr.map(escape).join(delim) + close;
+  return open + arr.map(item =>
+      item === null ? ''    // pg represents null as empty strings
+      : item === '' ? '""'  // when an element, empty string is quoted
+      : escape(item)
+  ).join(delim) + close;
 
   function escape(str) {
     const special = new Set([open, delim, close, '\\', '"']);

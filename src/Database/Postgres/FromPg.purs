@@ -304,5 +304,6 @@ else instance fromPgInnerTup_base :: FromPg a => InnerTup a where
       , parser:
           \_ exprs -> case exprs of
             [expr] -> aParser expr
-            _ -> Left $ mkErr Nothing "Unexpected extraneous elements (too many values!)"
+            _ -> Left $ mkErr Nothing "Unexpected extraneous elements (too many or zero values!)"
       }
+

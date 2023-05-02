@@ -58,10 +58,16 @@ in pkgs.mkShell {
     ];
 
     shellHook = ''
+
       function init_pg {
         pgloc=$PWD/pg
         [ -e $pgloc ] || lpg make $pgloc
         export PSPG_TESTING_DB_CONN_STRING=$(lpg do $pgloc bash -c 'echo $LPG_CONNSTR')
       }
+
+      function start_pg {
+        lpg do ./pg bash -c 'pg_ctl start'
+      }
+
     '';
 }
