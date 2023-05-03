@@ -28,6 +28,7 @@ in { ps-pkgs, ... }:
         argonaut-core
         argonaut-codecs
         argonaut-generic
+        spec  # actually a test dep, but purs-nix seems to be bugged (?)
       ];
 
     foreign."Database.Postgres.Connection".node_modules = node_modules;
