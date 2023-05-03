@@ -27,7 +27,7 @@ import Data.Either (Either(..))
 
 import Database.Postgres.Internal.ParseComposite (parseComposite)
 import Database.Postgres.Connection (Connection)
-import Database.Postgres.ToPg (class ToPg, toPg)
+import Database.Postgres.ToPg (ToPg, toPg_tup0)
 import Database.Postgres.FromPg (class FromPg, fromPg, ParseErr)
 import Database.Postgres.Types (PgExpr(..), Tup0, tup0)
 
@@ -78,9 +78,9 @@ toThrow aff = liftAff $ aff >>= \a -> liftEffect $ case a of
 -- | Except in highly unusualy circumstances, the result should never fail
 -- | in `m`. Instead, it should return a `Left`.
 query ::
-  forall p m r. MonadAff m => ToPg p => FromPg r =>
-  String -> p -> Connection -> m (Either PgErr (Array r))
-query sql params conn = liftAff $
+  forall p m r. MonadAff m => FromPg r =>
+  ToPg p -> String -> p -> Connection -> m (Either PgErr (Array r))
+query toPg sql params conn = liftAff $
   case parseParams (toPg params) of
     Left e -> pure (Left $ PgErr_ParamErr e)
     Right paramExprs -> do
@@ -107,15 +107,15 @@ query sql params conn = liftAff $
 
 -- | Like `query`, but errors are thrown in `Aff`
 queryThrow ::
-  forall p m r. MonadAff m => ToPg p => FromPg r =>
-  String -> p -> Connection -> m (Array r)
-queryThrow sql params conn = toThrow $ query sql params conn
+  forall p m r. MonadAff m => FromPg r =>
+  ToPg p -> String -> p -> Connection -> m (Array r)
+queryThrow toPg sql params conn = toThrow $ query toPg sql params conn
 
 -- | Like `query`, but no query parameters
 query_ ::
   forall m r. MonadAff m => FromPg r =>
   String -> Connection -> m (Either PgErr (Array r))
-query_ sql conn = query sql tup0 conn
+query_ sql conn = query toPg_tup0 sql tup0 conn
 
 -- | Like `query_`, but errors are thrown in `Aff`
 queryThrow_ ::
@@ -125,21 +125,21 @@ queryThrow_ sql conn = toThrow $ query_ sql conn
 
 -- | Like `query`, but no return value
 exec ::
-  forall p m. MonadAff m => ToPg p =>
-  String -> p -> Connection -> m (Either PgErr Unit)
-exec sql params conn = rmap (\(_ :: Array Tup0) -> unit) <$> query sql params conn
+  forall p m. MonadAff m =>
+  ToPg p -> String -> p -> Connection -> m (Either PgErr Unit)
+exec toPg sql params conn = rmap (\(_ :: Array Tup0) -> unit) <$> query toPg sql params conn
 
 -- | Like `exec`, but errors are thrown in `Aff`
 execThrow ::
-  forall p m. MonadAff m => ToPg p =>
-  String -> p -> Connection -> m Unit
-execThrow sql params conn = toThrow $ exec sql params conn
+  forall p m. MonadAff m =>
+  ToPg p -> String -> p -> Connection -> m Unit
+execThrow toPg sql params conn = toThrow $ exec toPg sql params conn
 
 -- | Like `exec`, but no query parameters or return value
 exec_ ::
   forall m. MonadAff m =>
   String -> Connection -> m (Either PgErr Unit)
-exec_ sql conn = exec sql tup0 conn
+exec_ sql conn = exec toPg_tup0 sql tup0 conn
 
 -- | Like `exec_`, but errors are thrown in `Aff`
 execThrow_ ::

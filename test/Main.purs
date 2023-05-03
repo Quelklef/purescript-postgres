@@ -15,7 +15,8 @@ import Database.Postgres.Connection (Connection, open) as Pg
 import Database.Postgres.Types (Tup(..)) as Pg
 import Database.Postgres.Query as Pq
 import Database.Postgres.FromPg (class FromPg)
-import Database.Postgres.ToPg (class ToPg)
+import Database.Postgres.ToPg (ToPg)
+import Database.Postgres.ToPg as Tp
 
 import Test.Spec (Spec, SpecT, around, describe, it)
 import Test.Spec.Assertions (shouldEqual)
@@ -43,36 +44,36 @@ spec = around withDb $ do
 
       let
         itExpr ::
-          forall ps. Eq ps => Show ps => FromPg (Pg.Tup ps) => ToPg (Pg.Tup ps) =>
-          String -> String -> ps -> SpecT Aff Pg.Connection Identity Unit
-        itExpr pgType pgVal psVal = do
+          forall ps. Eq ps => Show ps => FromPg (Pg.Tup ps) =>
+          ToPg (Pg.Tup ps) -> String -> String -> ps -> SpecT Aff Pg.Connection Identity Unit
+        itExpr toPg pgType pgVal psVal = do
           it (pgVal <> " --parse-> " <>  show psVal) \conn -> do
             res <- conn # Pq.queryThrow_ ("SELECT " <> pgVal <> "::" <> pgType)
             res `shouldEqual` [Pg.Tup psVal]
           it (pgVal <> " <-print-- " <> show psVal) \conn -> do
-            res <- conn # Pq.queryThrow ("SELECT $1::" <> pgType <> " = " <> pgVal <> "::" <> pgType) (Pg.Tup psVal)
+            res <- conn # Pq.queryThrow toPg ("SELECT $1::" <> pgType <> " = " <> pgVal <> "::" <> pgType) (Pg.Tup psVal)
             res `shouldEqual` [Pg.Tup true]
 
       describe "Int" do
-        itExpr "INT" "7" 7
-        itExpr "INT" "-7" (-7)
-        itExpr "INT" "0" 0
+        itExpr (Tp.toPg_Tup Tp.toPg_Int) "INT" "7" 7
+        itExpr (Tp.toPg_Tup Tp.toPg_Int) "INT" "-7" (-7)
+        itExpr (Tp.toPg_Tup Tp.toPg_Int) "INT" "0" 0
 
       describe "Number" do
-        itExpr "REAL" "1.25" 1.25
-        itExpr "REAL" "-1.25" (-1.25)
-        itExpr "REAL" "0" 0.0
+        itExpr (Tp.toPg_Tup Tp.toPg_Number) "REAL" "1.25" 1.25
+        itExpr (Tp.toPg_Tup Tp.toPg_Number) "REAL" "-1.25" (-1.25)
+        itExpr (Tp.toPg_Tup Tp.toPg_Number) "REAL" "0" 0.0
 
       describe "Maybe" do
-        itExpr "REAL" "NULL" (Nothing :: Maybe Number)
-        itExpr "TEXT" "'NULL'" $ Just "NULL"
-        itExpr "TEXT" "'null'" $ Just "null"
+        itExpr (Tp.toPg_Tup $ Tp.toPg_Maybe Tp.toPg_Number) "REAL" "NULL" (Nothing :: Maybe Number)
+        itExpr (Tp.toPg_Tup $ Tp.toPg_Maybe Tp.toPg_String) "TEXT" "'NULL'" $ Just "NULL"
+        itExpr (Tp.toPg_Tup $ Tp.toPg_Maybe Tp.toPg_String) "TEXT" "'null'" $ Just "null"
 
       describe "String" do
-        itExpr "TEXT" "'abc'" "abc"
-        itExpr "TEXT" "''" ""
-        itExpr "TEXT" "'has \" quote'" "has \" quote"
-        itExpr "TEXT" "'has '' quote'" "has ' quote"
+        itExpr (Tp.toPg_Tup Tp.toPg_String) "TEXT" "'abc'" "abc"
+        itExpr (Tp.toPg_Tup Tp.toPg_String) "TEXT" "''" ""
+        itExpr (Tp.toPg_Tup Tp.toPg_String) "TEXT" "'has \" quote'" "has \" quote"
+        itExpr (Tp.toPg_Tup Tp.toPg_String) "TEXT" "'has '' quote'" "has ' quote"
 
       describe "Array" do
         itExpr "REAL[]" "'{}'" ([] :: Array Number)
