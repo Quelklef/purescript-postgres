@@ -6,12 +6,17 @@ module Database.Postgres.ToPg
   -- v Forced exports
   -- , class InnerTup
   -- , toPg_inner
-  , toPg_tup0
   , toPg_Int
   , toPg_Number
   , toPg_String
   , toPg_Maybe
-  , toPg_Tup
+  , toPg_Array
+  , toPg_Set
+  , toPg_Tup0
+  , toPg_Tup1
+  , toPg_Tup2
+  , toPg_Tup3
+  , toPg_Tup4
   ) where
 
 import Prelude
@@ -43,9 +48,6 @@ encloseWith before after str = before <> str <> after
 -- end util --
 type ToPg a = a -> PgExpr
 
-toPg_tup0 :: ToPg (Tup Unit)
-toPg_tup0 _ = PgExpr "()"
-
 toPg_Int :: ToPg Int
 toPg_Int = show >>> PgExpr
 
@@ -59,56 +61,23 @@ toPg_Maybe :: ∀ a. ToPg a -> ToPg (Maybe a)
 toPg_Maybe toPg = case _ of
   Nothing -> PgExpr "null"
   Just v -> toPg v
+toPg_Array :: ∀ a. ToPg a -> ToPg (Array a)
+toPg_Array toPg = map (toPg >>> un PgExpr) >>> map (escape ["{", ",", "}"]) >>> intercalate "," >>> encloseWith "{" "}" >>> PgExpr
 
-toPg_Tup :: ∀ a. ToPg a -> ToPg (Tup a)
-toPg_Tup toPg (Tup a) = toPg a # un PgExpr # encloseWith "(" ")" # PgExpr
+toPg_Set :: ∀ a. Ord a => ToPg a -> ToPg (Set a)
+toPg_Set toPg = Set.toUnfoldable >>> Array.sort >>> (toPg_Array toPg)
 
--- class ToPg a where
---   toPg :: a -> PgExpr
+toPg_Tup0 :: ToPg (Tup Unit)
+toPg_Tup0 _ = PgExpr "()"
 
--- instance toPg_PgExpr :: ToPg PgExpr where
---   toPg = identity
+toPg_Tup1 :: ∀ a. ToPg a -> ToPg (Tup a)
+toPg_Tup1 toPg (Tup a) = toPg a # un PgExpr # encloseWith "(" ")" # PgExpr
 
--- instance toPg_String :: ToPg String where
---   toPg = PgExpr
+toPg_Tup2 :: ∀ a b. ToPg a -> ToPg b -> ToPg (Tup (a /\ b))
+toPg_Tup2 toPgA toPgB (Tup (a /\ b)) = [toPgA a, toPgB b] # map (un PgExpr) # intercalate "," # encloseWith "(" ")" # PgExpr
 
--- instance toPg_Boolean :: ToPg Boolean where
---   toPg = PgExpr <<< case _ of
---     true -> "t"
---     false -> "f"
+toPg_Tup3 :: ∀ a b c. ToPg a -> ToPg b -> ToPg c -> ToPg (Tup (a /\ b /\ c))
+toPg_Tup3 toPgA toPgB toPgC (Tup (a /\ b /\ c)) = [toPgA a, toPgB b, toPgC c] # map (un PgExpr) # intercalate "," # encloseWith "(" ")" # PgExpr
 
--- instance toPg_Number :: ToPg Number where
---   toPg = show >>> PgExpr
-
--- instance toPg_Int :: ToPg Int where
---   toPg = show >>> PgExpr
-
--- instance toPg_Maybe :: ToPg a => ToPg (Maybe a) where
---   toPg = case _ of
---     Nothing -> PgExpr "null"
---     Just v -> toPg v
-
--- instance toPg_Array :: ToPg a => ToPg (Array a) where
---   toPg = map (toPg >>> un PgExpr) >>> map (escape ["{", ",", "}"]) >>> intercalate "," >>> encloseWith "{" "}" >>> PgExpr
-
--- instance toPg_Set :: (Ord a, ToPg a) => ToPg (Set a) where
---   toPg = Set.toUnfoldable >>> Array.sort >>> toPg
-
--- instance toPg_Tup :: InnerTup a => ToPg (Tup a) where
---   toPg (Tup a) = toPg_inner a # un PgExpr # encloseWith "(" ")" # PgExpr
-
--- class InnerTup a where
---   toPg_inner :: a -> PgExpr
-
--- instance innerTup_empty :: InnerTup Unit where
---   toPg_inner _ = PgExpr ""
-
--- else instance innerTup_recr :: (ToPg a, InnerTup b) => InnerTup (a /\ b) where
---   toPg_inner (a /\ b) =
---     let
---       a' = escape ["(", ",", ")"] $ un PgExpr $ toPg a
---       b' = un PgExpr $ toPg_inner b
---     in PgExpr $ a' <> "," <> b'
-
--- else instance innerTup_base :: ToPg a => InnerTup a where
---   toPg_inner a = PgExpr $ escape ["(", ",", ")"] (un PgExpr $ toPg a)
+toPg_Tup4 :: ∀ a b c d. ToPg a -> ToPg b -> ToPg c -> ToPg d -> ToPg (Tup (a /\ b /\ c /\ d))
+toPg_Tup4 toPgA toPgB toPgC toPgD (Tup (a /\ b /\ c /\ d)) = [toPgA a, toPgB b, toPgC c, toPgD d] # map (un PgExpr) # intercalate "," # encloseWith "(" ")" # PgExpr

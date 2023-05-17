@@ -27,7 +27,7 @@ import Data.Either (Either(..))
 
 import Database.Postgres.Internal.ParseComposite (parseComposite)
 import Database.Postgres.Connection (Connection)
-import Database.Postgres.ToPg (ToPg, toPg_tup0)
+import Database.Postgres.ToPg (ToPg, toPg_Tup0)
 import Database.Postgres.FromPg (class FromPg, fromPg, ParseErr)
 import Database.Postgres.Types (PgExpr(..), Tup0, tup0)
 
@@ -115,7 +115,7 @@ queryThrow toPg sql params conn = toThrow $ query toPg sql params conn
 query_ ::
   forall m r. MonadAff m => FromPg r =>
   String -> Connection -> m (Either PgErr (Array r))
-query_ sql conn = query toPg_tup0 sql tup0 conn
+query_ sql conn = query toPg_Tup0 sql tup0 conn
 
 -- | Like `query_`, but errors are thrown in `Aff`
 queryThrow_ ::
@@ -139,7 +139,7 @@ execThrow toPg sql params conn = toThrow $ exec toPg sql params conn
 exec_ ::
   forall m. MonadAff m =>
   String -> Connection -> m (Either PgErr Unit)
-exec_ sql conn = exec toPg_tup0 sql tup0 conn
+exec_ sql conn = exec toPg_Tup0 sql tup0 conn
 
 -- | Like `exec_`, but errors are thrown in `Aff`
 execThrow_ ::

@@ -55,39 +55,39 @@ spec = around withDb $ do
             res `shouldEqual` [Pg.Tup true]
 
       describe "Int" do
-        itExpr (Tp.toPg_Tup Tp.toPg_Int) "INT" "7" 7
-        itExpr (Tp.toPg_Tup Tp.toPg_Int) "INT" "-7" (-7)
-        itExpr (Tp.toPg_Tup Tp.toPg_Int) "INT" "0" 0
+        itExpr (Tp.toPg_Tup1 Tp.toPg_Int) "INT" "7" 7
+        itExpr (Tp.toPg_Tup1 Tp.toPg_Int) "INT" "-7" (-7)
+        itExpr (Tp.toPg_Tup1 Tp.toPg_Int) "INT" "0" 0
 
       describe "Number" do
-        itExpr (Tp.toPg_Tup Tp.toPg_Number) "REAL" "1.25" 1.25
-        itExpr (Tp.toPg_Tup Tp.toPg_Number) "REAL" "-1.25" (-1.25)
-        itExpr (Tp.toPg_Tup Tp.toPg_Number) "REAL" "0" 0.0
+        itExpr (Tp.toPg_Tup1 Tp.toPg_Number) "REAL" "1.25" 1.25
+        itExpr (Tp.toPg_Tup1 Tp.toPg_Number) "REAL" "-1.25" (-1.25)
+        itExpr (Tp.toPg_Tup1 Tp.toPg_Number) "REAL" "0" 0.0
 
       describe "Maybe" do
-        itExpr (Tp.toPg_Tup $ Tp.toPg_Maybe Tp.toPg_Number) "REAL" "NULL" (Nothing :: Maybe Number)
-        itExpr (Tp.toPg_Tup $ Tp.toPg_Maybe Tp.toPg_String) "TEXT" "'NULL'" $ Just "NULL"
-        itExpr (Tp.toPg_Tup $ Tp.toPg_Maybe Tp.toPg_String) "TEXT" "'null'" $ Just "null"
+        itExpr (Tp.toPg_Tup1 $ Tp.toPg_Maybe Tp.toPg_Number) "REAL" "NULL" (Nothing :: Maybe Number)
+        itExpr (Tp.toPg_Tup1 $ Tp.toPg_Maybe Tp.toPg_String) "TEXT" "'NULL'" $ Just "NULL"
+        itExpr (Tp.toPg_Tup1 $ Tp.toPg_Maybe Tp.toPg_String) "TEXT" "'null'" $ Just "null"
 
       describe "String" do
-        itExpr (Tp.toPg_Tup Tp.toPg_String) "TEXT" "'abc'" "abc"
-        itExpr (Tp.toPg_Tup Tp.toPg_String) "TEXT" "''" ""
-        itExpr (Tp.toPg_Tup Tp.toPg_String) "TEXT" "'has \" quote'" "has \" quote"
-        itExpr (Tp.toPg_Tup Tp.toPg_String) "TEXT" "'has '' quote'" "has ' quote"
+        itExpr (Tp.toPg_Tup1 Tp.toPg_String) "TEXT" "'abc'" "abc"
+        itExpr (Tp.toPg_Tup1 Tp.toPg_String) "TEXT" "''" ""
+        itExpr (Tp.toPg_Tup1 Tp.toPg_String) "TEXT" "'has \" quote'" "has \" quote"
+        itExpr (Tp.toPg_Tup1 Tp.toPg_String) "TEXT" "'has '' quote'" "has ' quote"
 
       describe "Array" do
-        itExpr "REAL[]" "'{}'" ([] :: Array Number)
-        itExpr "REAL[]" "'{1,2,3}'" [1.0, 2.0, 3.0]
-        itExpr "TEXT[]" "'{a,\"\",c}'" ["a", "", "c"]
-        itExpr "INT[][]" "'{{1,2},{3,4},{5,6}}'" [[1, 2], [3, 4], [5, 6]]
+        itExpr (Tp.toPg_Tup1 $ Tp.toPg_Array Tp.toPg_Number) "REAL[]" "'{}'" ([] :: Array Number)
+        itExpr (Tp.toPg_Tup1 $ Tp.toPg_Array Tp.toPg_Number) "REAL[]" "'{1,2,3}'" [1.0, 2.0, 3.0]
+        itExpr (Tp.toPg_Tup1 $ Tp.toPg_Array Tp.toPg_String) "TEXT[]" "'{a,\"\",c}'" ["a", "", "c"]
+        itExpr (Tp.toPg_Tup1 $ Tp.toPg_Array $ Tp.toPg_Array Tp.toPg_Int) "INT[][]" "'{{1,2},{3,4},{5,6}}'" [[1, 2], [3, 4], [5, 6]]
 
       describe "Sets" do
-        itExpr "REAL[]" "'{}'" (Set.empty :: Set Number)
-        itExpr "REAL[]" "'{1,2,3}'" $ Set.fromFoldable [1.0, 2.0, 3.0]
-        itExpr "TEXT[]" "'{a,\"\",c}'" $ Set.fromFoldable ["a", "", "c"]
-        itExpr "INT[][]" "'{{1,2},{3,4},{5,6}}'" $ Set.fromFoldable <<< map Set.fromFoldable $ [[1, 2], [3, 4], [5, 6]]
+        itExpr (Tp.toPg_Tup1 $ Tp.toPg_Set Tp.toPg_Number) "REAL[]" "'{}'" (Set.empty :: Set Number)
+        itExpr (Tp.toPg_Tup1 $ Tp.toPg_Set Tp.toPg_Number) "REAL[]" "'{1,2,3}'" $ Set.fromFoldable [1.0, 2.0, 3.0]
+        itExpr (Tp.toPg_Tup1 $ Tp.toPg_Set Tp.toPg_String) "TEXT[]" "'{a,\"\",c}'" $ Set.fromFoldable ["a", "", "c"]
+        itExpr (Tp.toPg_Tup1 $ Tp.toPg_Set $ Tp.toPg_Set Tp.toPg_Int) "INT[][]" "'{{1,2},{3,4},{5,6}}'" $ Set.fromFoldable <<< map Set.fromFoldable $ [[1, 2], [3, 4], [5, 6]]
 
       describe "Tuple" do
-        itExpr "anyelement" "(10, 20)" (Pg.Tup $ 10 /\ 20)
-        itExpr "anyelement" "('', 'a''b', 'a\"b', NULL::TEXT)" (Pg.Tup $ "" /\ "a'b" /\ "a\"b" /\ "NULL")
-        itExpr "anyelement" "(1, '{1, 2, 3}'::int[])" (Pg.Tup $ 1 /\ [1, 2, 3])
+        itExpr (Tp.toPg_Tup1 $ Tp.toPg_Tup2 Tp.toPg_Int Tp.toPg_Int) "anyelement" "(10, 20)" (Pg.Tup $ 10 /\ 20)
+        itExpr (Tp.toPg_Tup1 $ Tp.toPg_Tup4 Tp.toPg_String Tp.toPg_String Tp.toPg_String Tp.toPg_String) "anyelement" "('', 'a''b', 'a\"b', NULL::TEXT)" (Pg.Tup $ "" /\ "a'b" /\ "a\"b" /\ "NULL")
+        itExpr (Tp.toPg_Tup1 $ Tp.toPg_Tup2 Tp.toPg_Int (Tp.toPg_Array Tp.toPg_Int)) "anyelement" "(1, '{1, 2, 3}'::int[])" (Pg.Tup $ 1 /\ [1, 2, 3])
