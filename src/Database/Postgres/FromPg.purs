@@ -1,14 +1,13 @@
 module Database.Postgres.FromPg
-  ( class FromPg
+  ( FromPg
   , fromPg
-  , Impl
   , mkImpl
   , ParseErr(..)
+  , fromPg_Tup0
 
   -- v Forced exports
-  , impl
-  , class InnerTup
-  , impl_inner
+  --, class InnerTup
+  --, impl_inner
   ) where
 
 import Prelude
@@ -28,13 +27,15 @@ import Data.Bifunctor (lmap)
 import Data.Set (Set)
 import Data.Set (fromFoldable) as Set
 
-import Database.Postgres.Types (Tup(..), PgExpr(..))
+import Database.Postgres.Types (Tup(..), PgExpr(..), Tup0, tup0)
 import Database.Postgres.Internal.ParseComposite (parseComposite) as PC
 
+{-
 -- | Class of types which can be parsed out of SQL expressions
 -- |
 -- | The type is pretty arcane, so let's start with example usage:
 -- |
+-- TODO fix
 -- | ```purescript
 -- | newtype Box = Box { width :: Number, height :: Number }
 -- |
@@ -62,13 +63,14 @@ class FromPg a where
 --     responsibility of parsing them should fall on this
 --     library code. The client should not have to--or even
 --     be allowed to--think about SQL expressions.
---  b) Restricting access ot the SQL expressions gives better
+--  b) Restricting access to the SQL expressions gives better
 --     future compatibility for becoming database-polymorphic.
+-}
 
 -- | Represents a `FromPg` implementation.
 -- | This type is purposefully opaque.
 -- | See the `FromPg` docs for usage.
-newtype Impl a = Impl
+newtype FromPg a = FromPg
   { parser :: ExprParser a
   , typename :: String
   }
@@ -140,32 +142,32 @@ contextualize :: forall s a. String -> (s -> Either ParseErr a) -> (s -> Either 
 contextualize ctx parse expr = parse expr # lmap mapErr
   where mapErr (ParseErr err) = ParseErr $ err { context = List.Cons ctx err.context }
 
-mkImpl :: forall a b. FromPg a => (a -> Either String b) -> Impl b
-mkImpl parser =
-  let Impl innerImpl = (impl :: Impl a)
-      innerParser = innerImpl.parser
-  in Impl
-    { typename: innerImpl.typename  -- user types inherit pg typenames
+mkImpl :: forall a b. FromPg a -> (a -> Either String b) -> FromPg b
+mkImpl (FromPg { parser: parserA, typename: typenameA }) parserAToB =
+  FromPg
+    { typename: typenameA  -- user types inherit pg typenames
     , parser:
         \expr -> do
-          val <- innerParser expr
+          val <- parserA expr
           let parser' = contextualize "After a successful parse"
-                      $ parser <#> lmap \issue -> mkErr Nothing issue
+                      $ parserAToB <#> lmap \issue -> mkErr Nothing issue
           res <- parser' val
           pure res
     }
 
 -- | Parse a `PgExpr`
-fromPg :: forall a. FromPg a => PgExpr -> Either ParseErr a
-fromPg expr = parser expr # lmap finalizeErr
+fromPg :: forall a. FromPg a -> PgExpr -> Either ParseErr a
+fromPg (FromPg {parser, typename}) expr =
+  parser expr # lmap finalizeErr
   where
-  Impl { parser, typename } = impl
   finalizeErr (ParseErr err) = ParseErr $ err { typename = Just typename }
 
 parseComposite :: { open :: String, delim :: String, close :: String } -> PgExpr -> Either ParseErr (Array PgExpr)
 parseComposite opts expr = PC.parseComposite opts expr # lmap (\issue -> mkErr (Just expr) issue)
 
+{-
 -- begin instances --
+
 
 -- | Parsing into `PgExpr` will return the expression unchanged
 instance fromPg_PgExpr :: FromPg PgExpr where
@@ -306,4 +308,15 @@ else instance fromPgInnerTup_base :: FromPg a => InnerTup a where
             [expr] -> aParser expr
             _ -> Left $ mkErr Nothing "Unexpected extraneous elements (too many or zero values!)"
       }
+-}
 
+fromPg_Tup0 :: FromPg Tup0
+fromPg_Tup0 =
+  FromPg
+    { typename: "Tup0"
+    , parser:
+        \expr@(PgExpr str) ->
+          case str of
+              "()" -> Right tup0
+              _ -> Left $ mkErr (Just expr) "`fromPg_Tup0` expected `\"()\"`"
+    }

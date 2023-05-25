@@ -44,11 +44,12 @@ spec = around withDb $ do
 
       let
         itExpr ::
-          forall ps. Eq ps => Show ps => FromPg (Pg.Tup ps) =>
-          ToPg (Pg.Tup ps) -> String -> String -> ps -> SpecT Aff Pg.Connection Identity Unit
-        itExpr toPg pgType pgVal psVal = do
+          forall params. Eq params => Show params =>
+          ToPg (Pg.Tup params) -> FromPg (Pg.Tup params) -> String -> String -> params
+          -> SpecT Aff Pg.Connection Identity Unit
+        itExpr toPg fromPg pgType pgVal psVal = do
           it (pgVal <> " --parse-> " <>  show psVal) \conn -> do
-            res <- conn # Pq.queryThrow_ ("SELECT " <> pgVal <> "::" <> pgType)
+            res <- conn # Pq.queryThrow_ fromPg ("SELECT " <> pgVal <> "::" <> pgType)
             res `shouldEqual` [Pg.Tup psVal]
           it (pgVal <> " <-print-- " <> show psVal) \conn -> do
             res <- conn # Pq.queryThrow toPg ("SELECT $1::" <> pgType <> " = " <> pgVal <> "::" <> pgType) (Pg.Tup psVal)
