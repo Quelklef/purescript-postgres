@@ -41,8 +41,8 @@ local-postgres =
     (pkgs.fetchFromGitHub
       { owner = "quelklef";
         repo = "local-postgres";
-        rev = "7a313efd50eb7710fee02b719728028486ff4526";
-        sha256 = "1qw9b97f1pp0fyji0z684b0ja8b32n24m19izqj7km45sczqgljx";
+        rev = "d3f377454632b10621af009313b3700424b369cf";
+        sha256 = "sha256-67zbZjimGxYdx8rRpd0PBlMc7LMTUUNobDUpadfSlsA=";
       }) { inherit pkgs; };
 
 in pkgs.mkShell {
@@ -59,14 +59,14 @@ in pkgs.mkShell {
 
     shellHook = ''
 
-      function init_pg {
+      function pg_init {
         pgloc=$PWD/pg
         [ -e $pgloc ] || lpg make $pgloc
-        export PSPG_TESTING_DB_CONN_STRING=$(lpg do $pgloc bash -c 'echo $LPG_CONNSTR')
+        export PSPG_TESTING_DB_CONN_STRING=$(lpg bash $pgloc 'echo $LPG_CONNSTR')
       }
 
-      function start_pg {
-        lpg do ./pg bash -c 'pg_ctl start'
+      function pg_start {
+        lpg cmd ./pg pg_ctl start
       }
 
     '';
