@@ -15,7 +15,7 @@ npmlock2nix =
 node_modules =
   "${npmlock2nix.node_modules { src = ./.; }}/node_modules";
 
-in { ps-pkgs, ... }:
+in { ps-pkgs, ps-pkgs-ns, ... }:
   with ps-pkgs;
   { dependencies =
       [ effect
@@ -29,6 +29,7 @@ in { ps-pkgs, ... }:
         argonaut-codecs
         argonaut-generic
         spec  # actually a test dep, but purs-nix seems to be bugged (?)
+        ps-pkgs-ns.ursi.debug  # ^
       ];
 
     foreign."Database.Postgres.Connection".node_modules = node_modules;
