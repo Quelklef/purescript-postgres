@@ -71,7 +71,7 @@ toPg_Tup0 :: ToPg (Tup Unit)
 toPg_Tup0 _ = PgExpr "()"
 
 toPg_Tup1 :: ∀ a. ToPg a -> ToPg (Tup a)
-toPg_Tup1 toPg (Tup a) = toPg a # un PgExpr # encloseWith "(" ")" # PgExpr
+toPg_Tup1 toPg (Tup a) = toPg a # un PgExpr # (escape ["(", ",", ")"]) # encloseWith "(" ")" # PgExpr
 
 toPg_Tup2 :: ∀ a b. ToPg a -> ToPg b -> ToPg (Tup (a /\ b))
 toPg_Tup2 toPgA toPgB (Tup (a /\ b)) = [toPgA a, toPgB b] # map (un PgExpr) # intercalate "," # encloseWith "(" ")" # PgExpr
