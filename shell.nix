@@ -59,14 +59,17 @@ in pkgs.mkShell {
 
     shellHook = ''
 
-      function pg_init {
-        pgloc=$PWD/pg
-        [ -e $pgloc ] || lpg make $pgloc
+      pgloc=$PWD/pg
+      function pps.test {
+        [ -e "$pgloc" ] || lpg make "$pgloc"
         export PSPG_TESTING_DB_CONN_STRING=$(lpg bash $pgloc 'echo $LPG_CONNSTR')
+        lpg cmd ./pg pg_ctl start
+        purs-nix test
       }
 
-      function pg_start {
-        lpg cmd ./pg pg_ctl start
+      function pps.devt {
+        export pgloc; export -f pps.test
+        ${pkgs.findutils}/bin/find src test | ${pkgs.entr}/bin/entr -cs pps.test
       }
 
     '';
