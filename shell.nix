@@ -18,8 +18,8 @@ purs-nix =
     (pkgs.fetchFromGitHub
       { owner = "ursi";
         repo = "purs-nix";
-        rev = "66427405d2a3e0c2491646a6efc1716ce3731f3d";
-        sha256 = "sha256-aArvsmkMc+LF2wEdLryiX/kqzMjtLsbcniIuSfFKgxg=";
+        rev = "02f87b0ecbe0e286dff1da37038325d4a3a128c3";
+        sha256 = "sha256-fA7nTBbXR7zd7/PJkNrPA8pJzRCsOW20FRy8SzdEgJ0=";
       }
     ) { inherit system; };
 
@@ -27,13 +27,7 @@ package = import ./package.nix purs-nix;
 
 nixed = purs-nix.purs
   { srcs = [ ./src ];
-    inherit (package) dependencies foreign;
-
-    test-dependencies =
-      with purs-nix.ps-pkgs;
-      [
-        spec
-      ];
+    inherit (package) dependencies test-dependencies foreign;
   };
 
 local-postgres =
