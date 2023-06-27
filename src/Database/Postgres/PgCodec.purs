@@ -1,5 +1,7 @@
 module Database.Postgres.PgCodec
   ( PgCodec
+  , RowCodec
+  , PgRow
   , fromPg
   , toPg
   {- , mkImpl -}
@@ -49,12 +51,16 @@ import Database.Postgres.Types as Types
 import Database.Postgres.Internal.ParseComposite (parseComposite) as PC
 
 
-newtype PgCodec a = PgCodec
+newtype PgCodec pg a = PgCodec
   { typename :: String
-  , toPg :: a -> PgExpr
-  , fromPg :: PgExpr -> Either ParseErr a
+  , toPg :: a -> pg
+  , fromPg :: pg -> Either ParseErr a
   }
 
+
+type PgRow = PgExpr
+type RowCodec = PgCodec PgRow
+type FieldCodec = PgCodec PgExpr
 
 replace :: { this :: String, with :: String } -> String -> String
 replace { this, with } = Str.replaceAll (Str.Pattern this) (Str.Replacement with)
@@ -74,7 +80,7 @@ parseComposite opts expr = PC.parseComposite opts expr # lmap (\issue -> mkErr (
 
 
 -- | Integral-formatted number (eg, INT, SMALLINT, BIGINT)
-int :: PgCodec Int
+int :: FieldCodec Int
 int = PgCodec
   { typename: "integral number (INT, SMALLINT, BIGINT)"
   , toPg: show >>> PgExpr
@@ -85,7 +91,7 @@ int = PgCodec
 
 
 -- | Decimal-formatted number (eg, INT, FLOATING, DOUBLE PRECISION)
-number :: PgCodec Number
+number :: FieldCodec Number
 number = PgCodec
   { typename: "decimal number"
   , toPg: show >>> PgExpr
@@ -95,7 +101,7 @@ number = PgCodec
   }
 
 -- | Text (e.g., TEXT)
-text :: PgCodec String
+text :: FieldCodec String
 text = PgCodec
   { typename: "string"
   , toPg: PgExpr
@@ -104,7 +110,7 @@ text = PgCodec
 
 
 -- | Boolean value
-boolean :: PgCodec Boolean
+boolean :: FieldCodec Boolean
 boolean = PgCodec
   { typename: "boolean"
   , toPg: case _ of
@@ -120,7 +126,7 @@ boolean = PgCodec
 
 
 -- | Nullable value
-nullable :: forall a. PgCodec a -> PgCodec (Maybe a)
+nullable :: forall a. FieldCodec a -> FieldCodec (Maybe a)
 nullable (PgCodec inner) = PgCodec
   { typename: "nullble " <> inner.typename
   , toPg: case _ of
@@ -132,7 +138,7 @@ nullable (PgCodec inner) = PgCodec
   }
 
 -- | Array of things (type[])
-arrayOf :: ∀ a. PgCodec a -> PgCodec (Array a)
+arrayOf :: ∀ a. FieldCodec a -> FieldCodec (Array a)
 arrayOf (PgCodec inner) = PgCodec
   { typename: "array of " <> inner.typename
   , toPg: map (inner.toPg >>> un PgExpr >>> escape ["{", ",", "}"]) >>> intercalate "," >>> encloseWith "{" "}" >>> PgExpr
@@ -148,7 +154,7 @@ arrayOf (PgCodec inner) = PgCodec
 -- |
 -- | This is like an array but not
 -- TODO: documentation
-setOf :: forall a. Ord a => PgCodec a -> PgCodec (Set a)
+setOf :: forall a. Ord a => FieldCodec a -> FieldCodec (Set a)
 setOf (PgCodec inner) =
   let PgCodec arrayCodec = arrayOf (PgCodec inner)
   in PgCodec
@@ -163,7 +169,7 @@ setOf (PgCodec inner) =
   }
 
 -- | Zero-tuple (unit)
-tup0 :: PgCodec Tup0
+tup0 :: FieldCodec Tup0
 tup0 =
   PgCodec
     { typename: "Tup0"
@@ -177,7 +183,7 @@ tup0 =
 
 
 -- | One-tuple
-tup1 :: forall a. PgCodec a -> PgCodec (Tup a)
+tup1 :: forall a. FieldCodec a -> FieldCodec (Tup a)
 tup1 (PgCodec inner) = PgCodec
   { typename: "Tup1 of " <> inner.typename
   , toPg: un Tup >>> inner.toPg >>> un PgExpr >>> (escape ["(", ",", ")"]) >>> encloseWith "(" ")" >>> PgExpr
@@ -194,7 +200,7 @@ tup1 (PgCodec inner) = PgCodec
   }
 
 -- | Two-tuple
-tup2 :: forall a b. PgCodec a -> PgCodec b -> PgCodec (Tup (a /\ b))
+tup2 :: forall a b. FieldCodec a -> FieldCodec b -> FieldCodec (Tup (a /\ b))
 tup2 (PgCodec innerA) (PgCodec innerB) = PgCodec
   { typename: "Tup2 of (" <> innerA.typename <> " /\ " <> innerB.typename <> ")"
   , toPg: \(Tup (a /\ b)) -> [innerA.toPg a, innerB.toPg b] # map (un PgExpr) # intercalate "," # encloseWith "(" ")" # PgExpr
@@ -213,8 +219,8 @@ tup2 (PgCodec innerA) (PgCodec innerB) = PgCodec
 
 -- | Four-tuple (!)
 tup4 :: forall c1 c2 c3 c4.
-  PgCodec c1 -> PgCodec c2 -> PgCodec c3 -> PgCodec c4
-  -> PgCodec (Tup (c1 /\ c2 /\ c3 /\ c4))
+  FieldCodec c1 -> FieldCodec c2 -> FieldCodec c3 -> FieldCodec c4
+  -> FieldCodec (Tup (c1 /\ c2 /\ c3 /\ c4))
 tup4 (PgCodec c1) (PgCodec c2) (PgCodec c3) (PgCodec c4) = PgCodec
   { typename:
       "Tup4 of (" <> intercalate " /\ " [c1.typename, c2.typename, c3.typename, c4.typename] <> ")"
@@ -357,10 +363,10 @@ mkImpl (PgCodec { parser: parserA, typename: typenameA }) parserAToB =
 -}
 
 -- | Parse a `PgExpr`
-fromPg :: forall a. PgCodec a -> PgExpr -> Either ParseErr a
+fromPg :: forall pg a. PgCodec pg a -> pg -> Either ParseErr a
 fromPg (PgCodec inner) = inner.fromPg >>> lmap finalizeErr
   where finalizeErr (ParseErr err) = ParseErr $ err { typename = Just inner.typename }
 
-toPg :: forall a. PgCodec a -> a -> PgExpr
+toPg :: forall pg a. PgCodec pg a -> a -> pg
 toPg (PgCodec codec) = codec.toPg
 

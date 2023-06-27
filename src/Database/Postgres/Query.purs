@@ -27,7 +27,7 @@ import Data.Either (Either (..))
 
 import Database.Postgres.Internal.ParseComposite (parseComposite)
 import Database.Postgres.Connection (Connection)
-import Database.Postgres.PgCodec (PgCodec, fromPg, toPg, ParseErr)
+import Database.Postgres.PgCodec (RowCodec, PgCodec, fromPg, toPg, ParseErr)
 import Database.Postgres.PgCodec as PgCodec
 import Database.Postgres.Types (PgExpr (..), Tup0, tup0)
 
@@ -80,7 +80,7 @@ toThrow aff = liftAff $ aff >>= \a -> liftEffect $ case a of
 -- | in `m`. Instead, it should return a `Left`.
 query ::
   forall params m r. MonadAff m =>
-  PgCodec params -> PgCodec r -> String -> params -> Connection -> m (Either PgErr (Array r))
+  RowCodec params -> RowCodec r -> String -> params -> Connection -> m (Either PgErr (Array r))
 query inCodec outCodec sql params conn = liftAff $
   case parseParams (toPg inCodec params) of
     Left e -> pure (Left $ PgErr_ParamErr e)
@@ -109,31 +109,31 @@ query inCodec outCodec sql params conn = liftAff $
 -- | Like `query`, but errors are thrown in `Aff`
 queryThrow ::
   forall p m r. MonadAff m =>
-  PgCodec p -> PgCodec r -> String -> p -> Connection -> m (Array r)
+  RowCodec p -> RowCodec r -> String -> p -> Connection -> m (Array r)
 queryThrow inCodec outCodec sql params conn = toThrow $ query inCodec outCodec sql params conn
 
 -- | Like `query`, but no query parameters
 query_ ::
   forall m r. MonadAff m =>
-  PgCodec r -> String -> Connection -> m (Either PgErr (Array r))
+  RowCodec r -> String -> Connection -> m (Either PgErr (Array r))
 query_ outCodec sql conn = query PgCodec.tup0 outCodec sql tup0 conn
 
 -- | Like `query_`, but errors are thrown in `Aff`
 queryThrow_ ::
   forall m r. MonadAff m =>
-  PgCodec r -> String -> Connection -> m (Array r)
+  RowCodec r -> String -> Connection -> m (Array r)
 queryThrow_ codec sql conn = toThrow $ query_ codec sql conn
 
 -- | Like `query`, but no return value
 exec ::
   forall p m. MonadAff m =>
-  PgCodec p -> String -> p -> Connection -> m (Either PgErr Unit)
+  RowCodec p -> String -> p -> Connection -> m (Either PgErr Unit)
 exec inCodec sql params conn = rmap (\(_ :: Array Tup0) -> unit) <$> query inCodec PgCodec.tup0 sql params conn
 
 -- | Like `exec`, but errors are thrown in `Aff`
 execThrow ::
   forall p m. MonadAff m =>
-  PgCodec p -> String -> p -> Connection -> m Unit
+  RowCodec p -> String -> p -> Connection -> m Unit
 execThrow codec sql params conn = toThrow $ exec codec sql params conn
 
 -- | Like `exec`, but no query parameters or return value

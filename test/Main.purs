@@ -14,7 +14,7 @@ import Data.Set as Set
 import Database.Postgres.Connection (Connection, open) as Pg
 import Database.Postgres.Types (Tup(..)) as Pg
 import Database.Postgres.Query as Pq
-import Database.Postgres.PgCodec (PgCodec, fromPg, toPg, ParseErr)
+import Database.Postgres.PgCodec (RowCodec, PgCodec, fromPg, toPg, ParseErr)
 import Database.Postgres.PgCodec as PgCodec
 import Database.Postgres.PgCodec as K
 
@@ -45,7 +45,7 @@ spec = around withDb $ do
       let
         itExpr ::
           forall params. Eq params => Show params =>
-          PgCodec (Pg.Tup params) -> String -> String -> params
+          RowCodec (Pg.Tup params) -> String -> String -> params
           -> SpecT Aff Pg.Connection Identity Unit
         itExpr codec pgType pgVal psVal = do
           it (pgVal <> " --parse-> " <>  show psVal) \conn -> do
