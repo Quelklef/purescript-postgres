@@ -27,7 +27,7 @@ import Data.Either (Either (..))
 
 import Database.Postgres.Internal.ParseComposite (parseComposite)
 import Database.Postgres.Connection (Connection)
-import Database.Postgres.PgCodec (RowCodec, PgCodec, fromPg, toPg, ParseErr)
+import Database.Postgres.PgCodec (RowCodec, PgCodec, fromPg, toPg, ParseErr, parseDbRow)
 import Database.Postgres.PgCodec as PgCodec
 import Database.Postgres.Types (PgExpr (..), Tup0, tup0)
 
@@ -82,29 +82,20 @@ query ::
   forall params m r. MonadAff m =>
   RowCodec params -> RowCodec r -> String -> params -> Connection -> m (Either PgErr (Array r))
 query inCodec outCodec sql params conn = liftAff $
-  case parseParams (toPg inCodec params) of
-    Left e -> pure (Left $ PgErr_ParamErr e)
-    Right paramExprs -> do
-      eitherResultExprs <- catchIntoEither $ toAffE $ query_f { conn, sql, params: paramExprs }
-      pure $ do
-        resultExprs <- eitherResultExprs # lmap PgErr_ExecErr
-        results <- traverse (fromPg outCodec) resultExprs # lmap PgErr_ResultErr
-        pure results
+  do
+    eitherResultExprs <- catchIntoEither $ toAffE $ query_f { conn, sql, params: paramExprs }
+    pure $ do
+      resultExprs <- eitherResultExprs # lmap PgErr_ExecErr
+      results <- traverse (fromPg outCodec <=< parseDbRow) resultExprs # lmap PgErr_ResultErr
+      pure results
 
   where
 
   catchIntoEither :: forall m' e a. MonadError e m' => m' a -> m' (Either e a)
   catchIntoEither m = catchError (Right <$> m) (pure <<< Left)
 
-  parseParams :: PgExpr -> Either String (Array PgExpr)
-  parseParams expr =
-    expr
-    # parseComposite { open: "(", delim: ",", close: ")" }
-    # lmap (\err ->
-      "Failed to parse PostgreSQL parameters.\n"
-      <> "This likely means you provided parameters as a value (:: a) instead of a row (:: Tup a).\n"
-      <> "Parameter expression: " <> un PgExpr expr <> "\n"
-      <> "Underlying parse error: " <> show err)
+  paramExprs :: Array PgExpr
+  paramExprs = (toPg inCodec) params
 
 -- | Like `query`, but errors are thrown in `Aff`
 queryThrow ::

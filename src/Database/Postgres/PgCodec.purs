@@ -6,6 +6,7 @@ module Database.Postgres.PgCodec
   , toPg
   {- , mkImpl -}
   , ParseErr (..)
+  , parseDbRow
 
   , int
   , number
@@ -58,9 +59,12 @@ newtype PgCodec pg a = PgCodec
   }
 
 
-type PgRow = PgExpr
+type PgRow = Array PgExpr
 type RowCodec = PgCodec PgRow
 type FieldCodec = PgCodec PgExpr
+
+parseDbRow :: PgExpr -> Either ParseErr (Array PgExpr)
+parseDbRow = parseComposite { open: "(", delim: ",", close: ")" }
 
 replace :: { this :: String, with :: String } -> String -> String
 replace { this, with } = Str.replaceAll (Str.Pattern this) (Str.Replacement with)
@@ -369,4 +373,3 @@ fromPg (PgCodec inner) = inner.fromPg >>> lmap finalizeErr
 
 toPg :: forall pg a. PgCodec pg a -> a -> pg
 toPg (PgCodec codec) = codec.toPg
-
