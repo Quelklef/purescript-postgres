@@ -6,7 +6,6 @@ module Database.Postgres.PgCodec
   , toPg
   {- , mkImpl -}
   , ParseErr (..)
-  , parseDbRow
 
   , int
   , number
@@ -30,6 +29,8 @@ import Data.Array (uncons) as Array
 import Data.Foldable (intercalate)
 import Data.Traversable (traverse)
 import Data.Int (fromString) as Int
+import Data.Nullable (Nullable)
+import Data.Nullable as Nullable
 import Data.Number (fromString) as Number
 import Data.Newtype (un)
 import Data.Tuple.Nested (type (/\), (/\))
@@ -59,12 +60,11 @@ newtype PgCodec pg a = PgCodec
   }
 
 
-type PgRow = Array PgExpr
-type RowCodec = PgCodec PgRow
-type FieldCodec = PgCodec PgExpr
+type QueryParam = Nullable PgExpr
 
-parseDbRow :: PgExpr -> Either ParseErr (Array PgExpr)
-parseDbRow = parseComposite { open: "(", delim: ",", close: ")" }
+type PgRow = Array QueryParam
+type RowCodec = PgCodec PgRow
+type FieldCodec = PgCodec QueryParam
 
 replace :: { this :: String, with :: String } -> String -> String
 replace { this, with } = Str.replaceAll (Str.Pattern this) (Str.Replacement with)
@@ -81,6 +81,15 @@ encloseWith before after str = before <> str <> after
 parseComposite :: { open :: String, delim :: String, close :: String } -> PgExpr -> Either ParseErr (Array PgExpr)
 parseComposite opts expr = PC.parseComposite opts expr # lmap (\issue -> mkErr (Just expr) issue)
 
+
+dealWithTheNullsPlease :: forall a. PgCodec PgExpr a -> PgCodec QueryParam a
+dealWithTheNullsPlease (PgCodec c) = PgCodec
+  { typename: c.typename
+  , toPg: c.toPg >>> Nullable.notNull
+  , fromPg: \nExpr -> case (Nullable.toMaybe nExpr) of
+      Nothing -> mkErr nExpr ("Got null but expected value of type " <> c.typename)
+      Right v -> c.fromPg v
+  }
 
 
 -- | Integral-formatted number (eg, INT, SMALLINT, BIGINT)
@@ -106,7 +115,7 @@ number = PgCodec
 
 -- | Text (e.g., TEXT)
 text :: FieldCodec String
-text = PgCodec
+text = dealWithTheNullsPlease $ PgCodec
   { typename: "string"
   , toPg: PgExpr
   , fromPg: un PgExpr >>> pure
@@ -132,13 +141,13 @@ boolean = PgCodec
 -- | Nullable value
 nullable :: forall a. FieldCodec a -> FieldCodec (Maybe a)
 nullable (PgCodec inner) = PgCodec
-  { typename: "nullble " <> inner.typename
+  { typename: "nullable " <> inner.typename
   , toPg: case _ of
-      Nothing -> PgExpr "null"
+      Nothing -> Nullable.null
       Just a -> inner.toPg a
-  , fromPg: case _ of
-      PgExpr "" -> pure Nothing
-      expr -> Just <$> inner.fromPg expr
+  , fromPg: Nullable.toMaybe >>> case _ of
+      Nothing -> pure Nothing
+      Just expr -> Just <$> inner.fromPg (Nullable.notNull expr)
   }
 
 -- | Array of things (type[])
@@ -242,6 +251,17 @@ tup4 (PgCodec c1) (PgCodec c2) (PgCodec c3) (PgCodec c4) = PgCodec
         v3 <- c3.fromPg e3
         v4 <- c4.fromPg e4
         pure (Tup (v1 /\ v2 /\ v3 /\ v4))
+  }
+
+
+row2 :: forall t1 t2 r.
+  FieldCodec t1 -> FieldCodec t2 -> RowCodec (t1 /\ t2)
+row2 (PgCodec f1) (PgCodec f2) = PgCodec
+  { typename: "size-2 row of (" <> f1.typename <> ", " <> f2.typename <> ")"
+  , toPg: \(x1 /\ x2) -> [ f1.toPg x1, f2.toPg x2 ]
+  , fromPg: case _ of
+      [x1, x2] -> (/\) <$> f1.fromPg x1 <*> f2.fromPg x2
+      row -> Left $ mkErr Nothing ("expected size-2 row, got row of size " <> show (Array.length row))
   }
 
 

@@ -25,25 +25,5 @@ async function()
   // In the case of multiple statements, pretend like no rows were returned.
   rows = Array.isArray(returned) ? [] : returned.rows;
 
-  // Transform rows from string[][] to a expr[]
-  // This means that some consumption code only has to account for handling
-  // expressions rather than expressions and expression arrays.
-  rows = rows.map(row => printComposite(row, "(,)"));
-
   return rows;
 };
-
-function printComposite(arr, chars) {
-  const [open, delim, close] = [...chars];
-  return open + arr.map(item =>
-      item === null ? ''    // pg represents null as empty strings
-      : item === '' ? '""'  // when an element, empty string is quoted
-      : escape(item)
-  ).join(delim) + close;
-
-  function escape(str) {
-    const special = new Set([open, delim, close, '\\', '"']);
-    const ok = [...special].every(char => !str.includes(char));
-    return ok ? str : [...str].map(ch => special.has(ch) ? '\\' + ch : ch).join('');
-  }
-}

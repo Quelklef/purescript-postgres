@@ -22,6 +22,7 @@ in { ... }:
         "lists"
         "arrays"
         "maybe"
+        "nullable"
         "either"
         "aff"
         "aff-promise"

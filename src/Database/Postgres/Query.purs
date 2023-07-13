@@ -20,6 +20,8 @@ import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Exception (Error, throw) as Ex
 import Control.Promise (Promise, toAffE)
 import Control.Monad.Error.Class (class MonadError, throwError, catchError)
+import Data.Nullable (Nullable)
+import Data.Nullable as Nullable
 import Data.Bifunctor (lmap, rmap)
 import Data.Newtype (un)
 import Data.Traversable (traverse)
@@ -27,7 +29,7 @@ import Data.Either (Either (..))
 
 import Database.Postgres.Internal.ParseComposite (parseComposite)
 import Database.Postgres.Connection (Connection)
-import Database.Postgres.PgCodec (RowCodec, PgCodec, fromPg, toPg, ParseErr, parseDbRow)
+import Database.Postgres.PgCodec (RowCodec, PgCodec, fromPg, toPg, ParseErr)
 import Database.Postgres.PgCodec as PgCodec
 import Database.Postgres.Types (PgExpr (..), Tup0, tup0)
 
@@ -35,8 +37,8 @@ import Database.Postgres.Types (PgExpr (..), Tup0, tup0)
 foreign import query_f ::
   { conn :: Connection
   , sql :: String
-  , params :: Array PgExpr
-  } -> Effect (Promise (Array PgExpr))  -- (pg expr)[]
+  , params :: Array (Nullable PgExpr)
+  } -> Effect (Promise (Array (Array (Nullable PgExpr))))
 
 -- | Represents an error when executing a query
 -- |
@@ -86,7 +88,7 @@ query inCodec outCodec sql params conn = liftAff $
     eitherResultExprs <- catchIntoEither $ toAffE $ query_f { conn, sql, params: paramExprs }
     pure $ do
       resultExprs <- eitherResultExprs # lmap PgErr_ExecErr
-      results <- traverse (fromPg outCodec <=< parseDbRow) resultExprs # lmap PgErr_ResultErr
+      results <- traverse (fromPg outCodec) resultExprs # lmap PgErr_ResultErr
       pure results
 
   where
@@ -94,7 +96,7 @@ query inCodec outCodec sql params conn = liftAff $
   catchIntoEither :: forall m' e a. MonadError e m' => m' a -> m' (Either e a)
   catchIntoEither m = catchError (Right <$> m) (pure <<< Left)
 
-  paramExprs :: Array PgExpr
+  paramExprs :: Array (Nullable PgExpr)
   paramExprs = (toPg inCodec) params
 
 -- | Like `query`, but errors are thrown in `Aff`
