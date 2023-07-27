@@ -45,50 +45,50 @@ spec = around withDb $ do
       let
         itExpr ::
           forall params. Eq params => Show params =>
-          RowCodec (Pg.Tup params) -> String -> String -> params
+          RowCodec params -> String -> String -> params
           -> SpecT Aff Pg.Connection Identity Unit
         itExpr codec pgType pgVal psVal = do
           it (pgVal <> " --parse-> " <>  show psVal) \conn -> do
             res <- conn # Pq.queryThrow_ codec ("SELECT " <> pgVal <> "::" <> pgType)
-            res `shouldEqual` [Pg.Tup psVal]
+            res `shouldEqual` [psVal]
           it (pgVal <> " <-print-- " <> show psVal) \conn -> do
-            res <- conn # Pq.queryThrow codec (PgCodec.tup1 PgCodec.boolean) ("SELECT $1::" <> pgType <> " = " <> pgVal <> "::" <> pgType) (Pg.Tup psVal)
-            res `shouldEqual` [Pg.Tup true]
+            res <- conn # Pq.queryThrow codec (PgCodec.row1 PgCodec.boolean) ("SELECT $1::" <> pgType <> " = " <> pgVal <> "::" <> pgType) psVal
+            res `shouldEqual` [true]
 
       describe "Int" do
-        itExpr (K.tup1 K.int) "INT" "7" 7
-        itExpr (K.tup1 K.int) "INT" "-7" (-7)
-        itExpr (K.tup1 K.int) "INT" "0" 0
+        itExpr (K.row1 K.int) "INT" "7" 7
+        itExpr (K.row1 K.int) "INT" "-7" (-7)
+        itExpr (K.row1 K.int) "INT" "0" 0
 
       describe "Number" do
-        itExpr (K.tup1 K.number) "REAL" "1.25" 1.25
-        itExpr (K.tup1 K.number) "REAL" "-1.25" (-1.25)
-        itExpr (K.tup1 K.number) "REAL" "0" 0.0
+        itExpr (K.row1 K.number) "REAL" "1.25" 1.25
+        itExpr (K.row1 K.number) "REAL" "-1.25" (-1.25)
+        itExpr (K.row1 K.number) "REAL" "0" 0.0
 
       describe "Maybe" do
-        itExpr (K.tup1 $ K.nullable K.number) "REAL" "NULL" (Nothing :: Maybe Number)
-        itExpr (K.tup1 $ K.nullable K.text) "TEXT" "'NULL'" $ Just "NULL"
-        itExpr (K.tup1 $ K.nullable K.text) "TEXT" "'null'" $ Just "null"
+        itExpr (K.row1 $ K.nullable K.number) "REAL" "NULL" (Nothing :: Maybe Number)
+        itExpr (K.row1 $ K.nullable K.text) "TEXT" "'NULL'" $ Just "NULL"
+        itExpr (K.row1 $ K.nullable K.text) "TEXT" "'null'" $ Just "null"
 
       describe "String" do
-        itExpr (K.tup1 K.text) "TEXT" "'abc'" "abc"
-        itExpr (K.tup1 K.text) "TEXT" "''" ""
-        itExpr (K.tup1 K.text) "TEXT" "'has \" quote'" "has \" quote"
-        itExpr (K.tup1 K.text) "TEXT" "'has '' quote'" "has ' quote"
+        itExpr (K.row1 K.text) "TEXT" "'abc'" "abc"
+        itExpr (K.row1 K.text) "TEXT" "''" ""
+        itExpr (K.row1 K.text) "TEXT" "'has \" quote'" "has \" quote"
+        itExpr (K.row1 K.text) "TEXT" "'has '' quote'" "has ' quote"
 
       describe "Array" do
-        itExpr (K.tup1 $ K.arrayOf K.number) "REAL[]" "'{}'" ([] :: Array Number)
-        itExpr (K.tup1 $ K.arrayOf K.number) "REAL[]" "'{1,2,3}'" [1.0, 2.0, 3.0]
-        itExpr (K.tup1 $ K.arrayOf K.text) "TEXT[]" "'{a,\"\",c}'" ["a", "", "c"]
-        itExpr (K.tup1 $ K.arrayOf $ K.arrayOf K.int)  "INT[][]" "'{{1,2},{3,4},{5,6}}'" [[1, 2], [3, 4], [5, 6]]
+        itExpr (K.row1 $ K.arrayOf K.number) "REAL[]" "'{}'" ([] :: Array Number)
+        itExpr (K.row1 $ K.arrayOf K.number) "REAL[]" "'{1,2,3}'" [1.0, 2.0, 3.0]
+        itExpr (K.row1 $ K.arrayOf K.text) "TEXT[]" "'{a,\"\",c}'" ["a", "", "c"]
+        itExpr (K.row1 $ K.arrayOf $ K.arrayOf K.int)  "INT[][]" "'{{1,2},{3,4},{5,6}}'" [[1, 2], [3, 4], [5, 6]]
 
       describe "Sets" do
-        itExpr (K.tup1 $ K.setOf K.number) "REAL[]" "'{}'" (Set.empty :: Set Number)
-        itExpr (K.tup1 $ K.setOf K.number) "REAL[]" "'{1,2,3}'" $ Set.fromFoldable [1.0, 2.0, 3.0]
-        itExpr (K.tup1 $ K.setOf K.text) "TEXT[]" "'{a,\"\",c}'" $ Set.fromFoldable ["a", "", "c"]
-        itExpr (K.tup1 $ K.setOf $ K.setOf K.int) "INT[][]" "'{{1,2},{3,4},{5,6}}'" $ Set.fromFoldable <<< map Set.fromFoldable $ [[1, 2], [3, 4], [5, 6]]
+        itExpr (K.row1 $ K.setOf K.number) "REAL[]" "'{}'" (Set.empty :: Set Number)
+        itExpr (K.row1 $ K.setOf K.number) "REAL[]" "'{1,2,3}'" $ Set.fromFoldable [1.0, 2.0, 3.0]
+        itExpr (K.row1 $ K.setOf K.text) "TEXT[]" "'{a,\"\",c}'" $ Set.fromFoldable ["a", "", "c"]
+        itExpr (K.row1 $ K.setOf $ K.setOf K.int) "INT[][]" "'{{1,2},{3,4},{5,6}}'" $ Set.fromFoldable <<< map Set.fromFoldable $ [[1, 2], [3, 4], [5, 6]]
 
       describe "Tuple" do
-        itExpr (K.tup1 $ K.tup2 K.int K.int) "anyelement" "(10, 20)" (Pg.Tup $ 10 /\ 20)
-        itExpr (K.tup1 $ K.tup4 K.text K.text K.text K.text) "anyelement" "('', 'a''b', 'a\"b', NULL::TEXT)" (Pg.Tup $ "" /\ "a'b" /\ "a\"b" /\ "NULL")
-        itExpr (K.tup1 $ K.tup2 K.int (K.arrayOf K.int)) "anyelement" "(1, '{1, 2, 3}'::int[])" (Pg.Tup $ 1 /\ [1, 2, 3])
+        itExpr (K.row1 $ K.tup2 K.int K.int) "anyelement" "(10, 20)" (Pg.Tup $ 10 /\ 20)
+        itExpr (K.row1 $ K.tup4 K.text K.text K.text K.text) "anyelement" "('', 'a''b', 'a\"b', NULL::TEXT)" (Pg.Tup $ "" /\ "a'b" /\ "a\"b" /\ "NULL")
+        itExpr (K.row1 $ K.tup2 K.int (K.arrayOf K.int)) "anyelement" "(1, '{1, 2, 3}'::int[])" (Pg.Tup $ 1 /\ [1, 2, 3])

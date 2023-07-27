@@ -18,6 +18,9 @@ module Database.Postgres.PgCodec
   , tup1
   , tup2
   , tup4
+  , row0
+  , row1
+  , row2
   ) where
 
 import Prelude
@@ -48,7 +51,7 @@ import Data.String.Common (replaceAll) as Str
 import Data.String.Pattern (Pattern (..), Replacement (..)) as Str
 import Data.Newtype (un)
 
-import Database.Postgres.Types (Tup (..), PgExpr (..), Tup0)
+import Database.Postgres.Types (Tup (..), PgExpr (..), Tup0, QueryValue)
 import Database.Postgres.Types as Types
 import Database.Postgres.Internal.ParseComposite (parseComposite) as PC
 
@@ -60,11 +63,9 @@ newtype PgCodec pg a = PgCodec
   }
 
 
-type QueryParam = Nullable PgExpr
-
-type PgRow = Array QueryParam
+type PgRow = Array QueryValue
 type RowCodec = PgCodec PgRow
-type FieldCodec = PgCodec QueryParam
+type FieldCodec = PgCodec QueryValue
 
 replace :: { this :: String, with :: String } -> String -> String
 replace { this, with } = Str.replaceAll (Str.Pattern this) (Str.Replacement with)
@@ -78,23 +79,23 @@ escape specials =
 encloseWith :: String -> String -> String -> String
 encloseWith before after str = before <> str <> after
 
-parseComposite :: { open :: String, delim :: String, close :: String } -> PgExpr -> Either ParseErr (Array PgExpr)
+parseComposite :: { open :: String, delim :: String, close :: String } -> PgExpr -> Either ParseErr (Array QueryValue)
 parseComposite opts expr = PC.parseComposite opts expr # lmap (\issue -> mkErr (Just expr) issue)
 
 
-dealWithTheNullsPlease :: forall a. PgCodec PgExpr a -> PgCodec QueryParam a
+dealWithTheNullsPlease :: forall a. PgCodec PgExpr a -> PgCodec QueryValue a
 dealWithTheNullsPlease (PgCodec c) = PgCodec
   { typename: c.typename
-  , toPg: c.toPg >>> Nullable.notNull
-  , fromPg: \nExpr -> case (Nullable.toMaybe nExpr) of
-      Nothing -> mkErr nExpr ("Got null but expected value of type " <> c.typename)
-      Right v -> c.fromPg v
+  , toPg: c.toPg >>> Just
+  , fromPg: \mExpr -> case mExpr of
+        Nothing -> Left $ mkErr mExpr ("Got null but expected value of type " <> c.typename)
+        Just expr -> c.fromPg expr
   }
 
 
 -- | Integral-formatted number (eg, INT, SMALLINT, BIGINT)
 int :: FieldCodec Int
-int = PgCodec
+int = dealWithTheNullsPlease $ PgCodec
   { typename: "integral number (INT, SMALLINT, BIGINT)"
   , toPg: show >>> PgExpr
   , fromPg:
@@ -105,7 +106,7 @@ int = PgCodec
 
 -- | Decimal-formatted number (eg, INT, FLOATING, DOUBLE PRECISION)
 number :: FieldCodec Number
-number = PgCodec
+number = dealWithTheNullsPlease $ PgCodec
   { typename: "decimal number"
   , toPg: show >>> PgExpr
   , fromPg:
@@ -124,7 +125,7 @@ text = dealWithTheNullsPlease $ PgCodec
 
 -- | Boolean value
 boolean :: FieldCodec Boolean
-boolean = PgCodec
+boolean = dealWithTheNullsPlease $ PgCodec
   { typename: "boolean"
   , toPg: case _ of
       true -> PgExpr "t"
@@ -143,24 +144,26 @@ nullable :: forall a. FieldCodec a -> FieldCodec (Maybe a)
 nullable (PgCodec inner) = PgCodec
   { typename: "nullable " <> inner.typename
   , toPg: case _ of
-      Nothing -> Nullable.null
+      Nothing -> Nothing
       Just a -> inner.toPg a
-  , fromPg: Nullable.toMaybe >>> case _ of
+  , fromPg: case _ of
       Nothing -> pure Nothing
-      Just expr -> Just <$> inner.fromPg (Nullable.notNull expr)
+      Just expr -> Just <$> inner.fromPg (Just expr)
   }
 
 -- | Array of things (type[])
 arrayOf :: ∀ a. FieldCodec a -> FieldCodec (Array a)
 arrayOf (PgCodec inner) = PgCodec
   { typename: "array of " <> inner.typename
-  , toPg: map (inner.toPg >>> un PgExpr >>> escape ["{", ",", "}"]) >>> intercalate "," >>> encloseWith "{" "}" >>> PgExpr
+  , toPg: map (inner.toPg >>> maybe "" (un PgExpr) >>> escape ["{", ",", "}"]) >>> intercalate "," >>> encloseWith "{" "}" >>> PgExpr >>> Just
   , fromPg:
       contextualize "while parsing Array"
-      $ \expr -> do
-        subExprs <- parseComposite { open: "{", delim: ",", close: "}" } expr
-        vals <- traverse inner.fromPg subExprs
-        pure vals
+      $ case _ of
+          Nothing -> Left $ mkErr Nothing "`arrayOf` got a null"
+          Just expr -> do
+            subExprs <- parseComposite { open: "{", delim: ",", close: "}" } expr
+            vals <- traverse inner.fromPg subExprs
+            pure vals
   }
 
 -- | Set of things
@@ -175,15 +178,17 @@ setOf (PgCodec inner) =
   , toPg: Set.toUnfoldable >>> Array.sort >>> arrayCodec.toPg
   , fromPg:
       contextualize "while parsing Set"
-      $ \expr -> do
-        subExprs <- parseComposite { open: "{", delim: ",", close: "}" } expr
-        vals <- traverse inner.fromPg subExprs
-        pure $ Set.fromFoldable vals
+      $ case _ of
+          Nothing -> Left $ mkErr Nothing "`setOf` got null"
+          Just expr -> do
+            subExprs <- parseComposite { open: "{", delim: ",", close: "}" } expr
+            vals <- traverse inner.fromPg subExprs
+            pure $ Set.fromFoldable vals
   }
 
 -- | Zero-tuple (unit)
 tup0 :: FieldCodec Tup0
-tup0 =
+tup0 = dealWithTheNullsPlease $
   PgCodec
     { typename: "Tup0"
     , toPg: \_ -> PgExpr "()"
@@ -199,35 +204,39 @@ tup0 =
 tup1 :: forall a. FieldCodec a -> FieldCodec (Tup a)
 tup1 (PgCodec inner) = PgCodec
   { typename: "Tup1 of " <> inner.typename
-  , toPg: un Tup >>> inner.toPg >>> un PgExpr >>> (escape ["(", ",", ")"]) >>> encloseWith "(" ")" >>> PgExpr
+  , toPg: un Tup >>> inner.toPg >>> maybe "" (un PgExpr) >>> escape ["(", ",", ")"] >>> encloseWith "(" ")" >>> PgExpr >>> Just
   , fromPg:
-      contextualize "while parsing Tup1"
-      $ \expr -> do
-        subExprs <- parseComposite { open: "(", delim: ",", close: ")" } expr
-        subExpr <-
-          case subExprs of
-            [subExpr] -> Right subExpr
-            _ -> Left $ mkErr (Just expr) "`fromPg_Tup1` incorrect number of `subExprs`"
-        val <- inner.fromPg subExpr
-        pure (Tup val)
+      contextualize "while parsing a Tup1"
+      $ case _ of
+          Nothing -> Left $ mkErr Nothing "`tup1` got null ☹"
+          Just expr -> do
+            subExprs <- parseComposite { open: "(", delim: ",", close: ")" } expr
+            subExpr <-
+              case subExprs of
+                [subExpr] -> Right subExpr
+                _ -> Left $ mkErr (Just expr) "`tup1` incorrect number of `subExprs`"
+            val <- inner.fromPg subExpr
+            pure (Tup val)
   }
 
 -- | Two-tuple
 tup2 :: forall a b. FieldCodec a -> FieldCodec b -> FieldCodec (Tup (a /\ b))
 tup2 (PgCodec innerA) (PgCodec innerB) = PgCodec
   { typename: "Tup2 of (" <> innerA.typename <> " /\ " <> innerB.typename <> ")"
-  , toPg: \(Tup (a /\ b)) -> [innerA.toPg a, innerB.toPg b] # map (un PgExpr) # intercalate "," # encloseWith "(" ")" # PgExpr
+  , toPg: \(Tup (a /\ b)) -> [innerA.toPg a, innerB.toPg b] # map (maybe "" (un PgExpr)) # intercalate "," # encloseWith "(" ")" # PgExpr # Just
   , fromPg:
       contextualize "while parsing Tup2"
-      $ \expr -> do
-        subExprs <- parseComposite { open: "(", delim: ",", close: ")" } expr
-        (subExpr1 /\ subExpr2) <-
-          case subExprs of
-            [subExpr1, subExpr2] -> Right (subExpr1 /\ subExpr2)
-            _ -> Left $ mkErr (Just expr) "`fromPg_Tup2` incorrect number of `subExprs`"
-        val1 <- innerA.fromPg subExpr1
-        val2 <- innerB.fromPg subExpr2
-        pure (Tup (val1 /\ val2))
+      $ case _ of
+          Nothing -> Left $ mkErr Nothing "`tup2` got null"
+          Just expr -> do
+            subExprs <- parseComposite { open: "(", delim: ",", close: ")" } expr
+            (subExpr1 /\ subExpr2) <-
+              case subExprs of
+                [subExpr1, subExpr2] -> Right (subExpr1 /\ subExpr2)
+                _ -> Left $ mkErr (Just expr) "`fromPg_Tup2` incorrect number of `subExprs`"
+            val1 <- innerA.fromPg subExpr1
+            val2 <- innerB.fromPg subExpr2
+            pure (Tup (val1 /\ val2))
   }
 
 -- | Four-tuple (!)
@@ -237,24 +246,45 @@ tup4 :: forall c1 c2 c3 c4.
 tup4 (PgCodec c1) (PgCodec c2) (PgCodec c3) (PgCodec c4) = PgCodec
   { typename:
       "Tup4 of (" <> intercalate " /\ " [c1.typename, c2.typename, c3.typename, c4.typename] <> ")"
-  , toPg: \(Tup (v1 /\ v2 /\ v3 /\ v4)) -> [c1.toPg v1, c2.toPg v2, c3.toPg v3, c4.toPg v4] # map (un PgExpr) # intercalate "," # encloseWith "(" ")" # PgExpr
+  , toPg: \(Tup (v1 /\ v2 /\ v3 /\ v4)) -> [c1.toPg v1, c2.toPg v2, c3.toPg v3, c4.toPg v4] # map (maybe "" (un PgExpr)) # intercalate "," # encloseWith "(" ")" # PgExpr # Just
   , fromPg:
       contextualize "while parsing Tup4"
-      $ \expr -> do
-        subExprs <- parseComposite { open: "(", delim: ",", close: ")" } expr
-        (e1 /\ e2 /\ e3 /\ e4) <-
-          case subExprs of
-            [e1, e2, e3, e4] -> Right (e1 /\ e2 /\ e3 /\ e4)
-            _ -> Left $ mkErr (Just expr) "`tup4` incorrect number of `subExprs`"
-        v1 <- c1.fromPg e1
-        v2 <- c2.fromPg e2
-        v3 <- c3.fromPg e3
-        v4 <- c4.fromPg e4
-        pure (Tup (v1 /\ v2 /\ v3 /\ v4))
+      $ case _ of
+          Nothing -> Left $ mkErr Nothing "`tup4` got null"
+          Just expr -> do
+            subExprs <- parseComposite { open: "(", delim: ",", close: ")" } expr
+            (e1 /\ e2 /\ e3 /\ e4) <-
+              case subExprs of
+                [e1, e2, e3, e4] -> Right (e1 /\ e2 /\ e3 /\ e4)
+                _ -> Left $ mkErr (Just expr) "`tup4` incorrect number of `subExprs`"
+            v1 <- c1.fromPg e1
+            v2 <- c2.fromPg e2
+            v3 <- c3.fromPg e3
+            v4 <- c4.fromPg e4
+            pure (Tup (v1 /\ v2 /\ v3 /\ v4))
   }
 
 
-row2 :: forall t1 t2 r.
+row0 :: RowCodec Unit
+row0 = PgCodec
+  { typename: "size-0 row"
+  , toPg: \_ -> []
+  , fromPg: case _ of
+      [] -> pure unit
+      row -> Left $ mkErr Nothing ("expected size-0 row, got row of size " <> show (Array.length row))
+  }
+
+row1 :: forall t.
+  FieldCodec t -> RowCodec t
+row1 (PgCodec f1) = PgCodec
+  { typename: "size-1 row of " <> f1.typename
+  , toPg: \x -> [ f1.toPg x ]
+  , fromPg: case _ of
+      [x1] -> f1.fromPg x1
+      row -> Left $ mkErr Nothing ("expected size-1 row,got row of size " <> show (Array.length row))
+  }
+
+row2 :: forall t1 t2.
   FieldCodec t1 -> FieldCodec t2 -> RowCodec (t1 /\ t2)
 row2 (PgCodec f1) (PgCodec f2) = PgCodec
   { typename: "size-2 row of (" <> f1.typename <> ", " <> f2.typename <> ")"

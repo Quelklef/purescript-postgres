@@ -20,6 +20,7 @@ import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Exception (Error, throw) as Ex
 import Control.Promise (Promise, toAffE)
 import Control.Monad.Error.Class (class MonadError, throwError, catchError)
+import Data.Maybe (Maybe)
 import Data.Nullable (Nullable)
 import Data.Nullable as Nullable
 import Data.Bifunctor (lmap, rmap)
@@ -88,7 +89,8 @@ query inCodec outCodec sql params conn = liftAff $
     eitherResultExprs <- catchIntoEither $ toAffE $ query_f { conn, sql, params: paramExprs }
     pure $ do
       resultExprs <- eitherResultExprs # lmap PgErr_ExecErr
-      results <- traverse (fromPg outCodec) resultExprs # lmap PgErr_ResultErr
+      let resultExprs' = resultExprs # (map <<< map) Nullable.toMaybe
+      results <- traverse (fromPg outCodec) resultExprs' # lmap PgErr_ResultErr
       pure results
 
   where
@@ -97,7 +99,8 @@ query inCodec outCodec sql params conn = liftAff $
   catchIntoEither m = catchError (Right <$> m) (pure <<< Left)
 
   paramExprs :: Array (Nullable PgExpr)
-  paramExprs = (toPg inCodec) params
+  paramExprs = (toPg inCodec) params # map Nullable.toNullable
+
 
 -- | Like `query`, but errors are thrown in `Aff`
 queryThrow ::
@@ -109,7 +112,7 @@ queryThrow inCodec outCodec sql params conn = toThrow $ query inCodec outCodec s
 query_ ::
   forall m r. MonadAff m =>
   RowCodec r -> String -> Connection -> m (Either PgErr (Array r))
-query_ outCodec sql conn = query PgCodec.tup0 outCodec sql tup0 conn
+query_ outCodec sql conn = query PgCodec.row0 outCodec sql unit conn
 
 -- | Like `query_`, but errors are thrown in `Aff`
 queryThrow_ ::
@@ -121,7 +124,7 @@ queryThrow_ codec sql conn = toThrow $ query_ codec sql conn
 exec ::
   forall p m. MonadAff m =>
   RowCodec p -> String -> p -> Connection -> m (Either PgErr Unit)
-exec inCodec sql params conn = rmap (\(_ :: Array Tup0) -> unit) <$> query inCodec PgCodec.tup0 sql params conn
+exec inCodec sql params conn = rmap (\(_ :: Array Unit) -> unit) <$> query inCodec PgCodec.row0 sql params conn
 
 -- | Like `exec`, but errors are thrown in `Aff`
 execThrow ::
@@ -133,7 +136,7 @@ execThrow codec sql params conn = toThrow $ exec codec sql params conn
 exec_ ::
   forall m. MonadAff m =>
   String -> Connection -> m (Either PgErr Unit)
-exec_ sql conn = exec PgCodec.tup0 sql tup0 conn
+exec_ sql conn = exec PgCodec.row0 sql unit conn
 
 -- | Like `exec_`, but errors are thrown in `Aff`
 execThrow_ ::
