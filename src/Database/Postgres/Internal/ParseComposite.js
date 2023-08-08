@@ -1,6 +1,10 @@
 export const parseComposite_f =
 ({ left, right, just, nothing }) =>
 {
+
+  // https://www.postgresql.org/docs/9.0/arrays.html#ARRAYS-IO
+  // https://www.postgresql.org/docs/current/rowtypes.html#ROWTYPES-IO-SYNTAX
+
   return ({ open, delim, close }) => expr => {
     const specials = new Set([open, delim, close]);
 
@@ -45,8 +49,6 @@ export const parseComposite_f =
   }
 
   function readSubexpr(expr, i, specials) {
-    // https://www.postgresql.org/docs/9.0/arrays.html#ARRAYS-IO
-
     if (specials.has(expr[i])) {
       // subexpr is empty string, which represents null
       // return `nothing` to indicate null
@@ -76,4 +78,5 @@ export const parseComposite_f =
 
     return [just(subexpr), j]
   }
+
 }

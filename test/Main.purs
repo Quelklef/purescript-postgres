@@ -80,6 +80,7 @@ spec = around withDb $ do
         itExpr (K.row1 $ K.arrayOf K.number) "REAL[]" "'{}'" ([] :: Array Number)
         itExpr (K.row1 $ K.arrayOf K.number) "REAL[]" "'{1,2,3}'" [1.0, 2.0, 3.0]
         itExpr (K.row1 $ K.arrayOf K.text) "TEXT[]" "'{a,\"\",c}'" ["a", "", "c"]
+        itExpr (K.row1 $ K.arrayOf $ K.nullable K.text) "TEXT[]" "'{a,null,c}'" [Just "a", Nothing, Just "c"]
         itExpr (K.row1 $ K.arrayOf $ K.arrayOf K.int)  "INT[][]" "'{{1,2},{3,4},{5,6}}'" [[1, 2], [3, 4], [5, 6]]
 
       describe "Sets" do

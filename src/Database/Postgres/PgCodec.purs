@@ -47,7 +47,7 @@ import Data.Set (Set)
 import Data.Set as Set
 import Data.Array as Array
 import Data.Tuple.Nested ((/\), type (/\))
-import Data.String.Common (replaceAll) as Str
+import Data.String.Common (replaceAll, toLower) as Str
 import Data.String.Pattern (Pattern (..), Replacement (..)) as Str
 import Data.Newtype (un)
 
@@ -155,7 +155,7 @@ nullable (PgCodec inner) = PgCodec
 arrayOf :: ∀ a. FieldCodec a -> FieldCodec (Array a)
 arrayOf (PgCodec inner) = PgCodec
   { typename: "array of " <> inner.typename
-  , toPg: map (inner.toPg >>> maybe "" (un PgExpr) >>> escape ["{", ",", "}"]) >>> intercalate "," >>> encloseWith "{" "}" >>> PgExpr >>> Just
+  , toPg: map (inner.toPg >>> toElement) >>> intercalate "," >>> encloseWith "{" "}" >>> PgExpr >>> Just
   , fromPg:
       contextualize "while parsing Array"
       $ case _ of
@@ -166,10 +166,24 @@ arrayOf (PgCodec inner) = PgCodec
             pure vals
   }
 
+  where
+
+  -- Prints/escapes QueryValue for use in PostgreSQL ARRAY.
+  --
+  -- In more words, for any QueryValue `v`, the value `toElement v` is
+  -- a PostgreSQL expression string which:
+  --   (1) is appropriate for use as an ARRAY element
+  --   (2) denotes `s`
+  toElement Nothing = "null"
+  toElement (Just (PgExpr str))
+    | Str.toLower str == "null" = str # encloseWith "\"" "\""
+    | str == "" = "\"\""
+    | otherwise = str # escape ["{", ",", "}"]
+
+
 -- | Set of things
 -- |
--- | This is like an array but not
--- TODO: documentation
+-- | In more words, this is like an array but not
 setOf :: forall a. Ord a => FieldCodec a -> FieldCodec (Set a)
 setOf (PgCodec inner) =
   let PgCodec arrayCodec = arrayOf (PgCodec inner)

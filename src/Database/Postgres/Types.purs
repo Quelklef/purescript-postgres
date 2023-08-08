@@ -33,6 +33,8 @@ derive instance ord_PgExpr :: Ord PgExpr
 -- | The Nothing value represents SQL `null`. All other SQL
 -- | values are represented as textual expressions
 type QueryValue = Maybe PgExpr
+-- FIXME: turn this to data type? `Nothing` less informative
+--   than a `Null` variant
 
 
 -- | Represents an SQL composite type (aka row)
