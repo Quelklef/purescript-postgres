@@ -52,7 +52,7 @@ spec = around withDb $ do
             res <- conn # Pq.queryThrow_ codec ("SELECT " <> pgVal <> "::" <> pgType)
             res `shouldEqual` [psVal]
           it (pgVal <> " <-print-- " <> show psVal) \conn -> do
-            res <- conn # Pq.queryThrow codec (PgCodec.row1 PgCodec.boolean) ("SELECT $1::" <> pgType <> " = " <> pgVal <> "::" <> pgType) psVal
+            res <- conn # Pq.queryThrow codec (PgCodec.row1 PgCodec.boolean) ("SELECT $1::" <> pgType <> " IS NOT DISTINCT FROM " <> pgVal <> "::" <> pgType) psVal
             res `shouldEqual` [true]
 
       describe "Int" do
