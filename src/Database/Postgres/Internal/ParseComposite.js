@@ -5,7 +5,7 @@ export const parseComposite_f =
   // https://www.postgresql.org/docs/9.0/arrays.html#ARRAYS-IO
   // https://www.postgresql.org/docs/current/rowtypes.html#ROWTYPES-IO-SYNTAX
 
-  return ({ open, delim, close }) => expr => {
+  return ({ open, delim, close, exprIsNull }) => expr => {
     const specials = new Set([open, delim, close]);
 
     let i = 0;
@@ -13,7 +13,7 @@ export const parseComposite_f =
     if (expr[i] === open)
       i += open.length;
     else
-      return expected(open, i);
+      return expected(expr, open, i);
 
     const subexprs = [];
 
@@ -21,7 +21,7 @@ export const parseComposite_f =
       if (i >= expr.length - 1) break;
 
       let subexpr;
-      [subexpr, i] = readSubexpr(expr, i, specials);
+      [subexpr, i] = readSubexpr(expr, i, specials, exprIsNull);
       subexprs.push(subexpr);
 
       if (i >= expr.length - 1) break;
@@ -29,18 +29,18 @@ export const parseComposite_f =
       if (expr[i] === delim)
         i += delim.length;
       else
-        return expected(delim, i);
+        return expected(expr, delim, i);
     }
 
     if (expr[i] === close)
       i += close.length;
     else
-      return expected(close, i);
+      return expected(expr, close, i);
 
     return right(subexprs);
   }
 
-  function expected(what, at) {
+  function expected(expr, what, at) {
     return left(
         `Expected '${what}' at index ${at} but got '${expr[at]}'\n`
       + `    ${expr}\n`
@@ -48,13 +48,7 @@ export const parseComposite_f =
     );
   }
 
-  function readSubexpr(expr, i, specials) {
-    if (specials.has(expr[i])) {
-      // subexpr is empty string, which represents null
-      // return `nothing` to indicate null
-      return nothing;
-    }
-
+  function readSubexpr(expr, i, specials, exprIsNull) {
     const isQuoted = expr[i] === '"';
 
     if (isQuoted) {
@@ -76,7 +70,7 @@ export const parseComposite_f =
 
     if (isQuoted) j++;
 
-    return [just(subexpr), j]
+    const result = exprIsNull(subexpr) ? nothing : just(subexpr);
+    return [result, j];
   }
-
 }

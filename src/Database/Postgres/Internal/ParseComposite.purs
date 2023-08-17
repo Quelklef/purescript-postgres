@@ -1,7 +1,5 @@
 -- | Leaked implementation detail
 module Database.Postgres.Internal.ParseComposite (parseComposite) where
-  
-import Prelude
 
 import Data.Either (Either (..))
 import Data.Maybe (Maybe (..))
@@ -15,10 +13,10 @@ foreign import parseComposite_f
      , just :: forall a. a -> Maybe a
      , nothing :: forall a. Maybe a
      }
-  -> { open :: String, delim :: String, close :: String } -> PgExpr -> Either String (Array QueryValue)
+  -> { open :: String, delim :: String, close :: String, exprIsNull :: String -> Boolean } -> PgExpr -> Either String (Array QueryValue)
 
 parseComposite ::
-  { open :: String, delim :: String, close :: String } -> PgExpr -> Either String (Array QueryValue)
+  { open :: String, delim :: String, close :: String, exprIsNull :: String -> Boolean } -> PgExpr -> Either String (Array QueryValue)
 parseComposite opts expr = parseComposite_f
   { left: Left, right: Right, just: Just, nothing: Nothing }
   opts expr
