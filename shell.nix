@@ -66,5 +66,13 @@ in pkgs.mkShell {
         ${pkgs.findutils}/bin/find src test | ${pkgs.entr}/bin/entr -cs pps.test
       }
 
+      function pg.connstr {
+        export PG_CONNSTR=$(lpg bash "$pgloc" 'echo $LPG_CONNSTR')
+      }
+
+      function node-pg.shell {
+        node -i -e "$(< pg-playground.js)"
+      }
+
     '';
 }
