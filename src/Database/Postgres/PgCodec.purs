@@ -178,7 +178,7 @@ arrayOf (PgCodec inner) = PgCodec
   toElement (Just (PgExpr str))
     | Str.toLower str == "null" = str # encloseWith "\"" "\""
     | str == "" = "\"\""
-    | otherwise = str # escape ["{", ",", "}"]
+    | otherwise = str # escape ["{", ",", "}", "\\", "\""]
 
 
 -- | Set of things
@@ -236,7 +236,7 @@ tup1 (PgCodec inner) = PgCodec
 -- | Two-tuple
 tup2 :: forall a b. FieldCodec a -> FieldCodec b -> FieldCodec (Tup (a /\ b))
 tup2 (PgCodec innerA) (PgCodec innerB) = PgCodec
-  { typename: "Tup2 of (" <> innerA.typename <> " /\ " <> innerB.typename <> ")"
+  { typename: "Tup2 of (" <> innerA.typename <> """ /\ """ <> innerB.typename <> ")"
   , toPg: \(Tup (a /\ b)) -> [innerA.toPg a, innerB.toPg b] # map (maybe "" (un PgExpr)) # intercalate "," # encloseWith "(" ")" # PgExpr # Just
   , fromPg:
       contextualize "while parsing Tup2"
@@ -259,7 +259,7 @@ tup4 :: forall c1 c2 c3 c4.
   -> FieldCodec (Tup (c1 /\ c2 /\ c3 /\ c4))
 tup4 (PgCodec c1) (PgCodec c2) (PgCodec c3) (PgCodec c4) = PgCodec
   { typename:
-      "Tup4 of (" <> intercalate " /\ " [c1.typename, c2.typename, c3.typename, c4.typename] <> ")"
+      "Tup4 of (" <> intercalate """ /\ """ [c1.typename, c2.typename, c3.typename, c4.typename] <> ")"
   , toPg: \(Tup (v1 /\ v2 /\ v3 /\ v4)) -> [c1.toPg v1, c2.toPg v2, c3.toPg v3, c4.toPg v4] # map (maybe "" (un PgExpr)) # intercalate "," # encloseWith "(" ")" # PgExpr # Just
   , fromPg:
       contextualize "while parsing Tup4"
