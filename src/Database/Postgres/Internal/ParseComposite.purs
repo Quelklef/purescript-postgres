@@ -1,5 +1,7 @@
 -- | Leaked implementation detail
-module Database.Postgres.Internal.ParseComposite (parseComposite) where
+module Database.Postgres.Internal.ParseComposite (parseArray, parseTuple) where
+
+import Prelude
 
 import Data.Either (Either (..))
 import Data.Maybe (Maybe (..))
@@ -13,10 +15,23 @@ foreign import parseComposite_f
      , just :: forall a. a -> Maybe a
      , nothing :: forall a. Maybe a
      }
-  -> { open :: String, delim :: String, close :: String, exprIsNull :: String -> Boolean } -> PgExpr -> Either String (Array QueryValue)
+  -> { open :: String
+     , delim :: String
+     , close :: String
+     , exprIsNull :: String -> Boolean
+     , escapeStyle :: String
+     }
+  -> PgExpr
+  -> Either String (Array QueryValue)
 
-parseComposite ::
-  { open :: String, delim :: String, close :: String, exprIsNull :: String -> Boolean } -> PgExpr -> Either String (Array QueryValue)
-parseComposite opts expr = parseComposite_f
+parseArray :: PgExpr -> Either String (Array QueryValue)
+parseArray expr = parseComposite_f
   { left: Left, right: Right, just: Just, nothing: Nothing }
-  opts expr
+  { open: "{", delim: ",", close: "}", exprIsNull: (_ == "NULL"), escapeStyle: "backslash" }
+  expr
+
+parseTuple :: PgExpr -> Either String (Array QueryValue)
+parseTuple expr = parseComposite_f
+  { left: Left, right: Right, just: Just, nothing: Nothing }
+  { open: "(", delim: ",", close: ")", exprIsNull: (_ == ""), escapeStyle: "double" }
+  expr

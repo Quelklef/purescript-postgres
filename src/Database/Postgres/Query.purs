@@ -28,7 +28,6 @@ import Data.Newtype (un)
 import Data.Traversable (traverse)
 import Data.Either (Either (..))
 
-import Database.Postgres.Internal.ParseComposite (parseComposite)
 import Database.Postgres.Connection (Connection)
 import Database.Postgres.PgCodec (RowCodec, PgCodec, fromPg, toPg, ParseErr)
 import Database.Postgres.PgCodec as PgCodec

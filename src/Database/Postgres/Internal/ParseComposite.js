@@ -5,7 +5,7 @@ export const parseComposite_f =
   // https://www.postgresql.org/docs/9.0/arrays.html#ARRAYS-IO
   // https://www.postgresql.org/docs/current/rowtypes.html#ROWTYPES-IO-SYNTAX
 
-  return ({ open, delim, close, exprIsNull }) => expr => {
+  return ({ open, delim, close, exprIsNull, escapeStyle }) => expr => {
     const specials = new Set([open, delim, close]);
 
     let i = 0;
@@ -21,7 +21,7 @@ export const parseComposite_f =
       if (i >= expr.length - 1) break;
 
       let subexpr;
-      [subexpr, i] = readSubexpr(expr, i, specials, exprIsNull);
+      [subexpr, i] = readSubexpr(expr, i, specials, exprIsNull, escapeStyle);
       subexprs.push(subexpr);
 
       if (i >= expr.length - 1) break;
@@ -48,29 +48,43 @@ export const parseComposite_f =
     );
   }
 
-  function readSubexpr(expr, i, specials, exprIsNull) {
+  function readSubexpr(expr, i, specials, exprIsNull, escapeStyle) {
     const isQuoted = expr[i] === '"';
+    let subexpr = "";
 
     if (isQuoted) {
-      specials = new Set(['"', '\\']);
       i++;
+
+      if (escapeStyle === "double") {
+        while (
+          i < expr.length - 1 &&
+          !(expr[i] === '"' && expr[i + 1] !== '"')
+        ) {
+          subexpr += expr[i];
+          if (expr[i] === '"' && expr[i + 1] === '"') i += 2;
+          else i++;
+        }
+      } else if (escapeStyle === "backslash") {
+        while (i < expr.length && expr[i] !== '"') {
+          if (expr[i] === "\\") i++;
+          subexpr += expr[i];
+          i++;
+        }
+      } else {
+        throw new Error(
+          '`isQuoted` but `escapeStyle` is not `"double"` or `"backslash"`'
+        );
+      }
+
+      i++;
+    } else {
+      while (i < expr.length && !specials.has(expr[i])) {
+        subexpr += expr[i];
+        i++;
+      }
     }
-
-    let subexpr = '';
-
-    let j = i;
-    while (
-      j < expr.length
-      && !specials.has(expr[j])
-    ) {
-      j += expr[j] === '\\';
-      subexpr += expr[j];
-      j++;
-    }
-
-    if (isQuoted) j++;
 
     const result = exprIsNull(subexpr) ? nothing : just(subexpr);
-    return [result, j];
+    return [result, i];
   }
 }

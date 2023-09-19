@@ -53,7 +53,7 @@ import Data.Newtype (un)
 
 import Database.Postgres.Types (Tup (..), PgExpr (..), Tup0, QueryValue)
 import Database.Postgres.Types as Types
-import Database.Postgres.Internal.ParseComposite (parseComposite) as PC
+import Database.Postgres.Internal.ParseComposite (parseArray, parseTuple) as PC
 
 
 newtype PgCodec pg a = PgCodec
@@ -79,8 +79,10 @@ escape specials =
 encloseWith :: String -> String -> String -> String
 encloseWith before after str = before <> str <> after
 
-parseComposite :: { open :: String, delim :: String, close :: String, exprIsNull :: String -> Boolean } -> PgExpr -> Either ParseErr (Array QueryValue)
-parseComposite opts expr = PC.parseComposite opts expr # lmap (\issue -> mkErr (Just expr) issue)
+parseArray :: PgExpr -> Either ParseErr (Array QueryValue)
+parseArray expr = PC.parseArray expr # lmap (\issue -> mkErr (Just expr) issue)
+parseTuple :: PgExpr -> Either ParseErr (Array QueryValue)
+parseTuple expr = PC.parseTuple expr # lmap (\issue -> mkErr (Just expr) issue)
 
 
 dealWithTheNullsPlease :: forall a. PgCodec PgExpr a -> PgCodec QueryValue a
@@ -161,7 +163,7 @@ arrayOf (PgCodec inner) = PgCodec
       $ case _ of
           Nothing -> Left $ mkErr Nothing "`arrayOf` got a null"
           Just expr -> do
-            subExprs <- parseComposite { open: "{", delim: ",", close: "}", exprIsNull: (_ == "NULL") } expr
+            subExprs <- parseArray expr
             vals <- traverse inner.fromPg subExprs
             pure vals
   }
@@ -195,7 +197,7 @@ setOf (PgCodec inner) =
       $ case _ of
           Nothing -> Left $ mkErr Nothing "`setOf` got null"
           Just expr -> do
-            subExprs <- parseComposite { open: "{", delim: ",", close: "}", exprIsNull: (_ == "NULL") } expr
+            subExprs <- parseArray expr
             vals <- traverse inner.fromPg subExprs
             pure $ Set.fromFoldable vals
   }
@@ -224,7 +226,7 @@ tup1 (PgCodec inner) = PgCodec
       $ case _ of
           Nothing -> Left $ mkErr Nothing "`tup1` got null ☹"
           Just expr -> do
-            subExprs <- parseComposite { open: "(", delim: ",", close: ")", exprIsNull: (_ == "") } expr
+            subExprs <- parseTuple expr
             subExpr <-
               case subExprs of
                 [subExpr] -> Right subExpr
@@ -243,7 +245,7 @@ tup2 (PgCodec innerA) (PgCodec innerB) = PgCodec
       $ case _ of
           Nothing -> Left $ mkErr Nothing "`tup2` got null"
           Just expr -> do
-            subExprs <- parseComposite { open: "(", delim: ",", close: ")", exprIsNull: (_ == "") } expr
+            subExprs <- parseTuple expr
             (subExpr1 /\ subExpr2) <-
               case subExprs of
                 [subExpr1, subExpr2] -> Right (subExpr1 /\ subExpr2)
@@ -266,7 +268,7 @@ tup4 (PgCodec c1) (PgCodec c2) (PgCodec c3) (PgCodec c4) = PgCodec
       $ case _ of
           Nothing -> Left $ mkErr Nothing "`tup4` got null"
           Just expr -> do
-            subExprs <- parseComposite { open: "(", delim: ",", close: ")", exprIsNull: (_ == "") } expr
+            subExprs <- parseTuple expr
             (e1 /\ e2 /\ e3 /\ e4) <-
               case subExprs of
                 [e1, e2, e3, e4] -> Right (e1 /\ e2 /\ e3 /\ e4)
