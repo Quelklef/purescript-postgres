@@ -97,8 +97,6 @@ spec = around withDb $ do
         --itParsesAndPrints (K.row1 $ K.arrayOf $ K.arrayOf K.int)  "INT[][]" "'{{1,2},{3,4},{5,6}}'" [[1, 2], [3, 4], [5, 6]]
         itParsesAndPrints (K.row1 $ K.arrayOf K.text) "TEXT[]" """'{"",a''b,"a\"b","NULL"}'""" ["", "a'b", "a\"b", "NULL"]
         itParsesAndPrints (K.row1 $ K.arrayOf K.text) "TEXT[]" """'{"a\\b"}'""" ["a\\b"]
-        -- TODO
-        -- itRejects (K.row1 $ K.arrayOf K.number) "REAL[]" "'{1,2,3'"
 
       describe "Sets" do
         itParsesAndPrints (K.row1 $ K.setOf K.number) "REAL[]" "'{}'" (Set.empty :: Set Number)
@@ -115,5 +113,6 @@ spec = around withDb $ do
         itParses (K.row1 $ K.tup2 K.int K.int) "anyelement" "(10, 20)" (Pg.Tup $ 10 /\ 20)
         itParses (K.row1 $ K.tup4 K.text K.text K.text K.text) "anyelement" "('', 'a''b', 'a\"b', NULL::TEXT)" (Pg.Tup $ "" /\ "a'b" /\ "a\"b" /\ "NULL")
         itParses (K.row1 $ K.tup2 K.int (K.arrayOf K.int)) "anyelement" "(1, '{1, 2, 3}'::int[])" (Pg.Tup $ 1 /\ [1, 2, 3])
-        -- TODO
-        -- itRejects (K.row1 $ K.tup2 K.int K.int) "anyelement" "(10, 20"
+        itParses (K.row1 $ K.tup2 K.int (K.nullable K.int)) "anyelement" "(1,null)" (Pg.Tup $ 1 /\ Nothing)
+        itParses (K.row1 $ K.tup1 K.text) "anyelement" """("\"),)")""" (Pg.Tup $ "(\"),)")
+        itParses (K.row1 $ K.tup4 K.text K.text K.text K.text) "anyelement" """("hello","\"","),)","")""" (Pg.Tup $ "hello" /\ "\"" /\ "),)" /\ "")

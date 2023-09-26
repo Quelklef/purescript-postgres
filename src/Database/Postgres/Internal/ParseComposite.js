@@ -84,7 +84,7 @@ export const parseComposite_f =
       }
     }
 
-    const result = exprIsNull(subexpr) ? nothing : just(subexpr);
+    const result = !isQuoted && exprIsNull(subexpr) ? nothing : just(subexpr);
     return [result, i];
   }
 }

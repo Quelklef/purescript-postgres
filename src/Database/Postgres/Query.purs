@@ -53,9 +53,9 @@ data PgErr
 
 toThrow :: forall m a. MonadAff m => Aff (Either PgErr a) -> m a
 toThrow aff = liftAff $ aff >>= \a -> liftEffect $ case a of
-  Left (PgErr_ParamErr e) -> Ex.throw $ show e
+  Left (PgErr_ParamErr e) -> Ex.throw $ ("`PgErr_ParamErr`: " <> show e)
   Left (PgErr_ExecErr e) -> throwError e
-  Left (PgErr_ResultErr e) -> Ex.throw $ show e
+  Left (PgErr_ResultErr e) -> Ex.throw $ ("`PgErr_ResultErr`: " <> show e)
   Right val -> pure val
 
 -- | Perform a query

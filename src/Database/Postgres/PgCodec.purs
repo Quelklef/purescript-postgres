@@ -50,6 +50,10 @@ import Data.Tuple.Nested ((/\), type (/\))
 import Data.String.Common (replaceAll, toLower) as Str
 import Data.String.Pattern (Pattern (..), Replacement (..)) as Str
 import Data.Newtype (un)
+import Data.Map (Map)
+import Data.Map as Map
+import Foreign.Object as Foreign
+import Data.Foldable (foldMap)
 
 import Database.Postgres.Types (Tup (..), PgExpr (..), Tup0, QueryValue)
 import Database.Postgres.Types as Types
@@ -67,14 +71,20 @@ type PgRow = Array QueryValue
 type RowCodec = PgCodec PgRow
 type FieldCodec = PgCodec QueryValue
 
-replace :: { this :: String, with :: String } -> String -> String
-replace { this, with } = Str.replaceAll (Str.Pattern this) (Str.Replacement with)
+foreign import replace_f :: Foreign.Object String -> (String -> String)
+
+-- Make multiple replacements on a string in parallel
+--
+-- Follows the longest-match rule: if multiple replacements are valid
+-- at a point in the string, chooses the replacement with longest
+-- key and continues from the end of the inserted string.
+replace :: Map String String -> (String -> String)
+replace = Map.toUnfoldable >>> isArray >>> Foreign.fromFoldable >>> replace_f
+    where isArray :: forall a. Array a -> Array a
+          isArray = identity
 
 escape :: Array String -> String -> String
-escape specials =
-  (specials <> ["\""])
-  # map (\s -> replace { this: s, with: "\\" <> s })
-  # foldr compose identity
+escape = replace <<< foldMap (\s -> Map.singleton s ("\\" <> s))
 
 encloseWith :: String -> String -> String -> String
 encloseWith before after str = before <> str <> after
@@ -220,7 +230,7 @@ tup0 = dealWithTheNullsPlease $
 tup1 :: forall a. FieldCodec a -> FieldCodec (Tup a)
 tup1 (PgCodec inner) = PgCodec
   { typename: "Tup1 of " <> inner.typename
-  , toPg: un Tup >>> inner.toPg >>> maybe "" (un PgExpr) >>> escape ["(", ",", ")"] >>> encloseWith "(" ")" >>> PgExpr >>> Just
+  , toPg: un Tup >>> inner.toPg >>> maybe "" (un PgExpr) >>> escape ["(", ",", ")", "\""] >>> encloseWith "(" ")" >>> PgExpr >>> Just
   , fromPg:
       contextualize "while parsing a Tup1"
       $ case _ of
