@@ -53,7 +53,7 @@ import Data.Newtype (un)
 import Data.Map (Map)
 import Data.Map as Map
 import Foreign.Object as Foreign
-import Data.Foldable (foldMap)
+import Data.Foldable (foldMap, length)
 
 import Database.Postgres.Types (Tup (..), PgExpr (..), Tup0, QueryValue)
 import Database.Postgres.Types as Types
@@ -112,7 +112,7 @@ int = dealWithTheNullsPlease $ PgCodec
   , toPg: show >>> PgExpr
   , fromPg:
       contextualize "while parsing Int (SMALLINT, INT, BIGINT)"
-      $ \expr -> Int.fromString (un PgExpr expr) # maybe (Left $ mkErr (Just expr) "Bad format") pure
+      $ \expr -> Int.fromString (un PgExpr expr) # maybe (Left $ mkErr (Just expr) ("Bad `int` format: " <> (show expr))) pure
   }
 
 
@@ -123,7 +123,7 @@ number = dealWithTheNullsPlease $ PgCodec
   , toPg: show >>> PgExpr
   , fromPg:
       contextualize "while parsing Number (REAL, FIXED)"
-      $ \expr -> Number.fromString (un PgExpr expr) # maybe (Left $ mkErr (Just expr) "Bad format") pure
+      $ \expr -> Number.fromString (un PgExpr expr) # maybe (Left $ mkErr (Just expr) ("Bad `number` format: " <> (show expr))) pure
   }
 
 -- | Text (e.g., TEXT)
@@ -282,7 +282,7 @@ tup4 (PgCodec c1) (PgCodec c2) (PgCodec c3) (PgCodec c4) = PgCodec
             (e1 /\ e2 /\ e3 /\ e4) <-
               case subExprs of
                 [e1, e2, e3, e4] -> Right (e1 /\ e2 /\ e3 /\ e4)
-                _ -> Left $ mkErr (Just expr) "`tup4` incorrect number of `subExprs`"
+                _ -> Left $ mkErr (Just expr) ("`tup4` incorrect number (" <> (show $ (length subExprs :: Int)) <> ") of `subExprs`: " <> (show subExprs))
             v1 <- c1.fromPg e1
             v2 <- c2.fromPg e2
             v3 <- c3.fromPg e3
