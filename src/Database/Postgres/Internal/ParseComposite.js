@@ -5,7 +5,10 @@ export const parseComposite_f =
   // https://www.postgresql.org/docs/9.0/arrays.html#ARRAYS-IO
   // https://www.postgresql.org/docs/current/rowtypes.html#ROWTYPES-IO-SYNTAX
 
-  return ({ open, delim, close, exprIsNull, escapeStyle }) => expr => {
+  return ({ open, delim, close, compositeType }) => expr => {
+    if (compositeType === "array" && expr === `${open}${close}`)
+      return right([]);
+
     const specials = new Set([open, delim, close]);
 
     let i = 0;
@@ -18,10 +21,8 @@ export const parseComposite_f =
     const subexprs = [];
 
     while (true) {
-      if (i >= expr.length - 1) break;
-
       let subexpr;
-      [subexpr, i] = readSubexpr(expr, i, specials, exprIsNull, escapeStyle);
+      [subexpr, i] = readSubexpr(expr, i, specials, compositeType);
       subexprs.push(subexpr);
 
       if (i >= expr.length - 1) break;
@@ -48,14 +49,14 @@ export const parseComposite_f =
     );
   }
 
-  function readSubexpr(expr, i, specials, exprIsNull, escapeStyle) {
+  function readSubexpr(expr, i, specials, compositeType) {
     const isQuoted = expr[i] === '"';
     let subexpr = "";
 
     if (isQuoted) {
       i++;
 
-      if (escapeStyle === "double") {
+      if (compositeType === "tuple") {
         while (
           i < expr.length - 1 &&
           !(expr[i] === '"' && expr[i + 1] !== '"')
@@ -64,7 +65,7 @@ export const parseComposite_f =
           if (expr[i] === '"' && expr[i + 1] === '"') i += 2;
           else i++;
         }
-      } else if (escapeStyle === "backslash") {
+      } else if (compositeType === "array") {
         while (i < expr.length && expr[i] !== '"') {
           if (expr[i] === "\\") i++;
           subexpr += expr[i];
@@ -72,7 +73,7 @@ export const parseComposite_f =
         }
       } else {
         throw new Error(
-          '`isQuoted` but `escapeStyle` is not `"double"` or `"backslash"`'
+          '`isQuoted` but `compositeType` is not `"tuple"` or `"array"`'
         );
       }
 
@@ -84,7 +85,9 @@ export const parseComposite_f =
       }
     }
 
-    const result = !isQuoted && exprIsNull(subexpr) ? nothing : just(subexpr);
-    return [result, i];
+    if (isQuoted) return [just(subexpr), i];
+    if (compositeType === "array" && subexpr === "NULL") return [nothing, i];
+    if (compositeType === "tuple" && subexpr === "") return [nothing, i];
+    return [just(subexpr), i];
   }
 }

@@ -18,8 +18,7 @@ foreign import parseComposite_f
   -> { open :: String
      , delim :: String
      , close :: String
-     , exprIsNull :: String -> Boolean
-     , escapeStyle :: String
+     , compositeType :: String
      }
   -> PgExpr
   -> Either String (Array QueryValue)
@@ -27,11 +26,11 @@ foreign import parseComposite_f
 parseArray :: PgExpr -> Either String (Array QueryValue)
 parseArray expr = parseComposite_f
   { left: Left, right: Right, just: Just, nothing: Nothing }
-  { open: "{", delim: ",", close: "}", exprIsNull: (_ == "NULL"), escapeStyle: "backslash" }
+  { open: "{", delim: ",", close: "}", compositeType: "array" }
   expr
 
 parseTuple :: PgExpr -> Either String (Array QueryValue)
 parseTuple expr = parseComposite_f
   { left: Left, right: Right, just: Just, nothing: Nothing }
-  { open: "(", delim: ",", close: ")", exprIsNull: (_ == ""), escapeStyle: "double" }
+  { open: "(", delim: ",", close: ")", compositeType: "tuple" }
   expr
