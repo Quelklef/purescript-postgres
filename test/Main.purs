@@ -12,7 +12,7 @@ import Data.Set (Set)
 import Data.Set as Set
 
 import Database.Postgres.Connection (Connection, open) as Pg
-import Database.Postgres.Types (Tup(..)) as Pg
+import Database.Postgres.Types (Tup(..), tup0) as Pg
 import Database.Postgres.Query as Pq
 import Database.Postgres.PgCodec (RowCodec, PgCodec, fromPg, toPg, ParseErr)
 import Database.Postgres.PgCodec as PgCodec
@@ -111,8 +111,11 @@ spec = around withDb $ do
         -- `ERROR:  input of anonymous composite types is not implemented`
         -- ⅄ only needs parsing
         itParses (K.row1 $ K.tup2 K.int K.int) "anyelement" "(10, 20)" (Pg.Tup $ 10 /\ 20)
-        itParses (K.row1 $ K.tup4 K.text K.text K.text K.text) "anyelement" "('', 'a''b', 'a\"b', NULL::TEXT)" (Pg.Tup $ "" /\ "a'b" /\ "a\"b" /\ "NULL")
+        itParses (K.row1 $ K.tup4 K.text K.text K.text (K.nullable K.text)) "anyelement" "('', 'a''b', 'a\"b', NULL::TEXT)" (Pg.Tup $ "" /\ "a'b" /\ "a\"b" /\ Nothing)
         itParses (K.row1 $ K.tup2 K.int (K.arrayOf K.int)) "anyelement" "(1, '{1, 2, 3}'::int[])" (Pg.Tup $ 1 /\ [1, 2, 3])
         itParses (K.row1 $ K.tup2 K.int (K.nullable K.int)) "anyelement" "(1,null)" (Pg.Tup $ 1 /\ Nothing)
         itParses (K.row1 $ K.tup1 K.text) "anyelement" """("\"),)")""" (Pg.Tup $ "(\"),)")
         itParses (K.row1 $ K.tup4 K.text K.text K.text K.text) "anyelement" """("hello","\"","),)","")""" (Pg.Tup $ "hello" /\ "\"" /\ "),)" /\ "")
+
+        itParses (K.row1 $ K.tup0) "anyelement" """row()""" (Pg.tup0)
+        itParses (K.row1 $ K.tup1 $ K.nullable K.text) "anyelement" """row(null)""" (Pg.Tup $ Nothing)
