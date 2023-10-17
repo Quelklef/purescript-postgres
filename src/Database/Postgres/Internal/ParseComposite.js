@@ -6,6 +6,7 @@ export const parseComposite_f =
   // https://www.postgresql.org/docs/current/rowtypes.html#ROWTYPES-IO-SYNTAX
 
   return ({ open, delim, close, compositeType }) => expr => {
+
     if (compositeType === "array" && expr === `${open}${close}`)
       return right([]);
 

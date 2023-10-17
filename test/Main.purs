@@ -114,8 +114,8 @@ spec = around withDb $ do
         itParses (K.row1 $ K.tup4 K.text K.text K.text (K.nullable K.text)) "anyelement" "('', 'a''b', 'a\"b', NULL::TEXT)" (Pg.Tup $ "" /\ "a'b" /\ "a\"b" /\ Nothing)
         itParses (K.row1 $ K.tup2 K.int (K.arrayOf K.int)) "anyelement" "(1, '{1, 2, 3}'::int[])" (Pg.Tup $ 1 /\ [1, 2, 3])
         itParses (K.row1 $ K.tup2 K.int (K.nullable K.int)) "anyelement" "(1,null)" (Pg.Tup $ 1 /\ Nothing)
-        itParses (K.row1 $ K.tup1 K.text) "anyelement" """("\"),)")""" (Pg.Tup $ "(\"),)")
-        itParses (K.row1 $ K.tup4 K.text K.text K.text K.text) "anyelement" """("hello","\"","),)","")""" (Pg.Tup $ "hello" /\ "\"" /\ "),)" /\ "")
+        itParses (K.row1 $ K.tup1 K.text) "anyelement" """row('"),)')""" (Pg.Tup $ "\"),)")
+        itParses (K.row1 $ K.tup4 K.text K.text K.text K.text) "anyelement" """('hello','"','),)','')""" (Pg.Tup $ "hello" /\ "\"" /\ "),)" /\ "")
 
         itParses (K.row1 $ K.tup0) "anyelement" """row()""" (Pg.tup0)
         itParses (K.row1 $ K.tup1 $ K.nullable K.text) "anyelement" """row(null)""" (Pg.Tup $ Nothing)
