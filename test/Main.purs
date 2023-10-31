@@ -8,6 +8,7 @@ import Effect.Aff (Aff, launchAff_)
 import Data.Tuple.Nested ((/\))
 import Data.Identity (Identity)
 import Data.Maybe (Maybe(..))
+import Data.Either (Either (..))
 import Data.Set (Set)
 import Data.Set as Set
 
@@ -19,7 +20,7 @@ import Database.Postgres.PgCodec as PgCodec
 import Database.Postgres.PgCodec as K
 
 import Test.Spec (Spec, SpecT, around, describe, it)
-import Test.Spec.Assertions (shouldEqual)
+import Test.Spec.Assertions (shouldEqual, shouldSatisfy)
 import Test.Spec.Runner (runSpec)
 import Test.Spec.Reporter.Console (consoleReporter)
 
@@ -119,3 +120,11 @@ spec = around withDb $ do
 
         itParses (K.row1 $ K.tup0) "anyelement" """row()""" (Pg.tup0)
         itParses (K.row1 $ K.tup1 $ K.nullable K.text) "anyelement" """row(null)""" (Pg.Tup $ Nothing)
+    describe "error handling" do
+      describe "invalid queries" do
+        it "returns a `PgErr_ExecErr`" \conn -> do
+          res <- conn # Pq.query_ (K.row1 K.int) "SELECT 'a'::int"
+          -- TODO investigate if there's better method than `shouldSatisfy` when docs aren't borken
+          res `shouldSatisfy` case _ of
+            Left (Pq.PgErr_ExecErr _) -> true
+            _ -> false

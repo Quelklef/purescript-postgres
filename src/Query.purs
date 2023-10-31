@@ -27,6 +27,8 @@ import Data.Bifunctor (lmap, rmap)
 import Data.Newtype (un)
 import Data.Traversable (traverse)
 import Data.Either (Either (..))
+import Data.Generic.Rep (class Generic)
+import Data.Show.Generic (genericShow)
 
 import Database.Postgres.Connection (Connection)
 import Database.Postgres.PgCodec (RowCodec, PgCodec, fromPg, toPg, ParseErr)
@@ -50,6 +52,9 @@ data PgErr
   = PgErr_ParamErr String
   | PgErr_ExecErr Ex.Error
   | PgErr_ResultErr ParseErr
+
+derive instance Generic PgErr _
+instance Show PgErr where show x = genericShow x
 
 toThrow :: forall m a. MonadAff m => Aff (Either PgErr a) -> m a
 toThrow aff = liftAff $ aff >>= \a -> liftEffect $ case a of
